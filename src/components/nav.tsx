@@ -122,6 +122,16 @@ export function Nav() {
               </Link>
             );
           })}
+          {isAdmin && (
+            <Link
+              href="/analytics"
+              className={`font-display text-sm font-semibold hover:text-primary transition-colors ${
+                pathname?.startsWith("/analytics") ? "text-primary font-bold" : "text-ink/80"
+              }`}
+            >
+              Analytics
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-4">
