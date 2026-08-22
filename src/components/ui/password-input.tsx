@@ -52,7 +52,6 @@ export function PasswordInput({
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}
-          tabIndex={-1}
           className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-plum transition-colors hover:text-primary"
         >
           <EyeIcon off={visible} />
