@@ -86,9 +86,15 @@ export async function fetchEmployees(): Promise<Employee[]> {
   try {
     const { data: dbProfiles, error } = await supabase
       .from("profiles")
+      // The FK must be named. salary_structure has two of them pointing at
+      // profiles - employee_id and updated_by - so an unqualified embed is
+      // ambiguous and PostgREST answers 300 (PGRST201) rather than guessing.
+      // That 300 was being swallowed into the mock-data fallback below, which
+      // is why this list looked like it worked while never once reading the
+      // database.
       .select(`
         *,
-        salary_structure (basic, hra, da, allowance, pf_rate, tax_rate)
+        salary_structure!salary_structure_employee_id_fkey (basic, hra, da, allowance, pf_rate, tax_rate)
       `)
       .eq("is_active", true);
 
@@ -157,7 +163,17 @@ export async function fetchEmployees(): Promise<Employee[]> {
       };
     });
   } catch (e) {
-    console.error("fetchEmployees failed, falling back to mock data:", e);
+    // Log the actual PostgREST fields; console.error on the raw object prints
+    // "Object" and tells you nothing about which query failed or why.
+    const err = e as { message?: string; code?: string; details?: string; hint?: string };
+    console.error(
+      "fetchEmployees failed, falling back to mock data:",
+      JSON.stringify(
+        { message: err?.message, code: err?.code, details: err?.details, hint: err?.hint },
+        null,
+        2,
+      ),
+    );
     return EMPLOYEES;
   }
 }
