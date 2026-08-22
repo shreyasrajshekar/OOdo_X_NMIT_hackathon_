@@ -1,7 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 export default function SignUpPage() {
+  const router = useRouter();
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // No backend yet — Phase 1 wires this to the createCompany server action.
+    router.push("/employees");
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -14,7 +25,7 @@ export default function SignUpPage() {
         </p>
       </div>
 
-      <form className="flex flex-col gap-4">
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1.5">
           <span className="font-display text-sm font-semibold text-ink">
             Company name
