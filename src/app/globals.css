@@ -184,6 +184,76 @@ thead tr {
 }
 
 /* --------------------------------------------------------------------------
+   Auth waves
+   The contour layer on the plum panel drifts sideways very slowly. It is drawn
+   wider than the panel so neither end is ever exposed. Purely decorative — the
+   reduced-motion block below stops it.
+   -------------------------------------------------------------------------- */
+
+@keyframes wave-drift {
+  from {
+    transform: translate3d(-8%, 0, 0);
+  }
+  to {
+    transform: translate3d(0%, 0, 0);
+  }
+}
+
+@keyframes wave-bloom {
+  from {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+
+.wave-drift {
+  animation: wave-drift 16s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* The form side gets its own instrument: long periodic swells that flow
+   continuously. Each layer is drawn twice as wide as the pane, so shifting it
+   by half its width lands on an identical phase and the loop never seams. */
+@keyframes wave-flow {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes wave-flow-reverse {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.wave-flow,
+.wave-flow-reverse {
+  animation-name: wave-flow;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.wave-flow-reverse {
+  animation-name: wave-flow-reverse;
+}
+
+.wave-bloom {
+  animation: wave-bloom 11s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+/* --------------------------------------------------------------------------
    Reduced motion
    Everything above is decorative. If the reader has asked for stillness, the
    layout must land in its final state immediately rather than merely faster.

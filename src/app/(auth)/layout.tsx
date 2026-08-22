@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { DayflowMark } from "@/components/ui/dayflow-mark";
+import { AuthWaves } from "@/components/ui/auth-waves";
+import { Logo, Wordmark } from "@/components/ui/brand";
 
 /**
  * Auth screens get a real front door: the product argument on the left, the
@@ -24,13 +25,14 @@ export default function AuthLayout({
           }}
         />
 
+        <AuthWaves />
+
         <div className="relative">
           <Link
             href="/"
-            className="inline-flex items-center gap-2.5 font-display text-[19px] font-extrabold tracking-[-0.02em] text-paper"
+            className="inline-flex items-center rounded-card transition-opacity hover:opacity-90"
           >
-            <DayflowMark size={32} plated priority />
-            Dayflow
+            <Wordmark tone="light" size={40} />
           </Link>
         </div>
 
@@ -74,8 +76,20 @@ export default function AuthLayout({
         </ul>
       </aside>
 
-      <main className="flex items-center justify-center px-6 py-12">
-        <div className="enter w-full max-w-md rounded-card border border-line/70 bg-paper/85 p-8 shadow-[0_1px_2px_rgba(92,61,84,0.04),0_24px_50px_-24px_rgba(92,61,84,0.18)] backdrop-blur-md">
+      <main className="relative flex flex-col items-center justify-center overflow-hidden px-6 py-12">
+        {/* The same wave field, mirrored and far quieter, so the form side
+            moves with the panel instead of sitting still beside it. */}
+        <AuthWaves tone="paper" />
+
+        {/* Below lg the panel is gone, so the mark carries the brand instead. */}
+        <div className="relative mb-6 flex items-center gap-2.5 lg:hidden">
+          <Logo size={34} priority />
+          <span className="font-display text-[19px] font-extrabold tracking-[-0.02em] text-primary">
+            Dayflow
+          </span>
+        </div>
+
+        <div className="enter relative w-full max-w-md rounded-card border border-line/70 bg-paper/85 p-8 shadow-[0_1px_2px_rgba(92,61,84,0.04),0_24px_50px_-24px_rgba(92,61,84,0.18)] backdrop-blur-md">
           {children}
         </div>
       </main>
