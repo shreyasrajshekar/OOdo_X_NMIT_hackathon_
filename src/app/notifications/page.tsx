@@ -1,18 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import type { Tables } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 import { Bell, Check, Trash2 } from 'lucide-react'
 
-interface Notification {
-  id: number
-  type: string
-  title: string
-  message: string
-  is_read: boolean
-  action_url: string | null
-  created_at: string
-}
+type Notification = Tables<'notifications'>
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -66,7 +59,8 @@ export default function NotificationsPage() {
     await supabase.from('notifications').delete().eq('id', id)
   }
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '—'
     return new Date(dateStr).toLocaleString('en-IN', { 
       day: 'numeric', 
       month: 'short', 

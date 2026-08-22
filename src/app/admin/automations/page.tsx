@@ -3,20 +3,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Activity } from 'lucide-react'
+import type { Tables } from '@/types/database'
 
-interface AutomationLog {
-  id: number
-  trigger_type: string
-  trigger_name: string
-  entity_type: string | null
-  entity_id: number | null
-  action_taken: string
-  status: string
-  error_message: string | null
-  cascade_id: string | null
-  execution_ms: number | null
-  created_at: string
-}
+type AutomationLog = Tables<'automation_logs'>
 
 export default function AutomationsPage() {
   const [logs, setLogs] = useState<AutomationLog[]>([])
@@ -50,7 +39,8 @@ export default function AutomationsPage() {
     return matchType && matchStatus
   })
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '—'
     return new Date(dateStr).toLocaleString('en-IN', { 
       day: 'numeric', 
       month: 'short', 
@@ -61,7 +51,7 @@ export default function AutomationsPage() {
     })
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null) => {
     switch (status) {
       case 'success':
         return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/15 text-green-400">Success</span>

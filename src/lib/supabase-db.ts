@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import type { TablesUpdate } from "@/types/database";
 import { 
   COMPANY_NAME, 
   EMPLOYEES, 
@@ -225,7 +226,7 @@ export async function createEmployeeInDb(
 
 export async function updateEmployeeInDb(id: string, updates: Partial<Employee>): Promise<boolean> {
   try {
-    const dbUpdates: Record<string, unknown> = {};
+    const dbUpdates: TablesUpdate<"profiles"> = {};
     if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
     if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
     if (updates.mobile !== undefined) dbUpdates.phone = updates.mobile;
@@ -481,7 +482,7 @@ export async function grantLeaveAllocation(alloc: Omit<LeaveAllocation, "id">): 
 
     if (existing) {
       const existingBalance = existing as DbLeaveBalance;
-      const updateData: Record<string, number> = {};
+      const updateData: TablesUpdate<"leave_balance"> = {};
       if (alloc.leaveType === "PAID") {
         updateData.paid_leave = (existingBalance.paid_leave || 0) + alloc.days;
       } else if (alloc.leaveType === "SICK") {
