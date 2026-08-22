@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { getAllAnalytics, AllAnalytics } from "@/lib/analytics";
+import { AdminGuard } from "@/components/admin-guard";
+import { ExportMenu, PageHeader } from "@/components/ui/data-ui";
+import { COMPANY_NAME } from "@/lib/mock-data";
+import {
+  downloadCsv,
+  downloadReportPdf,
+  generatedAt,
+} from "@/lib/pdf/export-report";
 import { 
   BarChart3, 
   Users, 
@@ -22,7 +30,7 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-export default function AnalyticsPage() {
+function AnalyticsPageInner() {
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
@@ -32,6 +40,7 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<'attendance' | 'leave' | 'payroll' | 'employee'>('attendance');
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,17 +86,215 @@ export default function AnalyticsPage() {
     }
   };
 
+  const periodLabel = `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
+
+  function analyticsCsvRows(): (string | number)[][] {
+    if (!data) return [];
+    return [
+      ["Attendance", "Employees", data.attendance.summary.total_employees],
+      ["Attendance", "Present days", data.attendance.summary.present_days],
+      ["Attendance", "Absent days", data.attendance.summary.absent_days],
+      ["Attendance", "Half days", data.attendance.summary.half_days],
+      ["Attendance", "Leave days", data.attendance.summary.leave_days],
+      ["Attendance", "Attendance rate", `${data.attendance.summary.attendance_rate}%`],
+      ["Leave", "Requested", data.leave.summary.total_requested],
+      ["Leave", "Approved", data.leave.summary.approved],
+      ["Leave", "Rejected", data.leave.summary.rejected],
+      ["Leave", "Pending", data.leave.summary.pending],
+      ["Payroll", "Total payroll", data.payroll.summary.total_payroll],
+      ["Payroll", "Total deductions", data.payroll.summary.total_deductions],
+      ["Payroll", "Net paid", data.payroll.summary.net_paid],
+      ["Payroll", "Average salary", data.payroll.summary.avg_salary],
+    ];
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      ["Area", "Metric", "Value"],
+      analyticsCsvRows(),
+      `dayflow-analytics-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`,
+    );
+  }
+
+  /** The whole month as one filed report, not just the tab on screen. */
+  async function exportPdf() {
+    if (!data) return;
+    setExporting(true);
+
+    const money = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+    try {
+      await downloadReportPdf(
+        {
+          title: `Analytics — ${periodLabel}`,
+          companyName: COMPANY_NAME,
+          meta: [
+            { label: "Generated", value: generatedAt() },
+            { label: "Period", value: periodLabel },
+            {
+              label: "Headcount",
+              value: String(data.attendance.summary.total_employees),
+            },
+            {
+              label: "Attendance rate",
+              value: `${data.attendance.summary.attendance_rate}%`,
+            },
+          ],
+          summary: [
+            {
+              label: "Present days",
+              value: String(data.attendance.summary.present_days),
+              tone: "success",
+            },
+            {
+              label: "Absent days",
+              value: String(data.attendance.summary.absent_days),
+              tone: data.attendance.summary.absent_days > 0 ? "warn" : "default",
+            },
+            {
+              label: "Leave approved",
+              value: String(data.leave.summary.approved),
+            },
+            {
+              label: "Leave pending",
+              value: String(data.leave.summary.pending),
+              tone: data.leave.summary.pending > 0 ? "warn" : "default",
+            },
+            { label: "Net paid", value: money(data.payroll.summary.net_paid) },
+          ],
+          sections: [
+            {
+              title: "Attendance by department",
+              columns: [
+                { header: "Department", width: 1.6 },
+                { header: "Present", width: 1, align: "right" as const },
+                { header: "Half day", width: 1, align: "right" as const },
+                { header: "Absent", width: 1, align: "right" as const },
+                { header: "Leave", width: 1, align: "right" as const },
+                { header: "Rate", width: 1, align: "right" as const },
+              ],
+              rows: data.attendance.by_department.map((d) => [
+                d.department,
+                String(d.present),
+                String(d.half_day),
+                String(d.absent),
+                String(d.leave),
+                `${d.rate}%`,
+              ]),
+              emptyLabel: "No attendance recorded for this period.",
+            },
+            {
+              title: "Attendance by employee",
+              columns: [
+                { header: "Employee", width: 2 },
+                { header: "Department", width: 1.4 },
+                { header: "Present", width: 1, align: "right" as const },
+                { header: "Half day", width: 1, align: "right" as const },
+                { header: "Absent", width: 1, align: "right" as const },
+                { header: "Leave", width: 1, align: "right" as const },
+                { header: "Rate", width: 1, align: "right" as const },
+              ],
+              rows: data.attendance.by_employee.map((e) => [
+                e.name,
+                e.department,
+                String(e.present),
+                String(e.half_day),
+                String(e.absent),
+                String(e.leave),
+                `${e.rate}%`,
+              ]),
+              emptyLabel: "No per-employee attendance for this period.",
+            },
+            {
+              title: "Late check-ins",
+              columns: [
+                { header: "Employee", width: 2 },
+                { header: "Department", width: 1.4 },
+                { header: "Date", width: 1.2 },
+                { header: "Check in", width: 1.2, align: "right" as const },
+              ],
+              rows: data.attendance.late_checkins.map((l) => [
+                l.name,
+                l.department,
+                l.date,
+                l.check_in,
+              ]),
+              emptyLabel: "Nobody checked in late this period.",
+            },
+            {
+              title: "Leave by department",
+              columns: [
+                { header: "Department", width: 2 },
+                { header: "Total", width: 1, align: "right" as const },
+                { header: "Approved", width: 1, align: "right" as const },
+                { header: "Rejected", width: 1, align: "right" as const },
+              ],
+              rows: data.leave.by_department.map((d) => [
+                d.department,
+                String(d.total),
+                String(d.approved),
+                String(d.rejected),
+              ]),
+              emptyLabel: "No leave requested this period.",
+            },
+            {
+              title: "Payroll by department",
+              columns: [
+                { header: "Department", width: 2 },
+                { header: "Total", width: 1.2, align: "right" as const },
+                { header: "Average", width: 1.2, align: "right" as const },
+              ],
+              rows: data.payroll.by_department.map((d) => [
+                d.department,
+                money(d.total),
+                money(d.avg),
+              ]),
+              emptyLabel: "No payroll processed this period.",
+            },
+            {
+              title: "Recent joiners",
+              columns: [
+                { header: "Employee", width: 2 },
+                { header: "Department", width: 1.4 },
+                { header: "Position", width: 1.6 },
+                { header: "Joined", width: 1.2 },
+              ],
+              rows: data.employee.recent_joiners.map((j) => [
+                j.name,
+                j.department,
+                j.position,
+                j.join_date,
+              ]),
+              emptyLabel: "No new joiners in this period.",
+            },
+          ],
+        },
+        `dayflow-analytics-${selectedYear}-${String(selectedMonth).padStart(2, "0")}`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const isNextDisabled = selectedYear === currentYear && selectedMonth === currentMonth;
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="mx-auto max-w-7xl">
-        
-        
+    <div>
+      <div>
         {/* PAGE HEADER */}
-        <div className="flex items-center gap-3 mb-6 enter" style={{ "--enter-delay": "0ms" } as React.CSSProperties}>
-          <BarChart3 className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-display font-bold text-ink">Analytics</h1>
+        <div className="mb-6">
+          <PageHeader
+            eyebrow="Insight"
+            title="Analytics"
+            description="Attendance, leave and payroll for the month, read straight off the live records."
+            actions={
+              <ExportMenu
+                onCsv={exportCsv}
+                onPdf={exportPdf}
+                busy={exporting || !data}
+              />
+            }
+          />
         </div>
 
         {/* MONTH/YEAR SELECTOR */}
@@ -707,5 +914,14 @@ function EmployeeTab({ data }: { data: AllAnalytics['employee'] }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Admin/HR only — employees are redirected to their own workspace. */
+export default function AnalyticsPage() {
+  return (
+    <AdminGuard>
+      <AnalyticsPageInner />
+    </AdminGuard>
   );
 }

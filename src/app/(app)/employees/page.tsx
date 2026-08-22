@@ -15,6 +15,7 @@ import {
 } from "@/components/employees/presence";
 import {
   EmptyState,
+  ExportMenu,
   FilterSelect,
   PageHeader,
   PersonCell,
@@ -27,6 +28,7 @@ import {
   Toolbar,
 } from "@/components/ui/data-ui";
 import {
+  COMPANY_NAME,
   DEPARTMENTS,
   employeeInitials,
   employeeName,
@@ -35,6 +37,11 @@ import {
   type Employee,
 } from "@/lib/mock-data";
 import { fetchAttendanceForDate, fetchEmployees } from "@/lib/supabase-db";
+import {
+  downloadCsv,
+  downloadReportPdf,
+  generatedAt,
+} from "@/lib/pdf/export-report";
 
 type SortKey = "name" | "newest" | "department" | "role";
 type View = "table" | "grid";
@@ -76,6 +83,7 @@ function EmployeesPageInner() {
   const [presence, setPresence] = useState<"all" | Presence>("all");
   const [sort, setSort] = useState<SortKey>("name");
   const [view, setView] = useState<View>("table");
+  const [exporting, setExporting] = useState(false);
 
   const todayISO = today();
 
@@ -186,44 +194,102 @@ function EmployeesPageInner() {
     setPresence("all");
   }
 
+  const EXPORT_HEADER = [
+    "Login ID",
+    "Name",
+    "Work email",
+    "Role",
+    "Department",
+    "Job title",
+    "Manager",
+    "Joined",
+    "Status today",
+  ];
+
+  function exportRows() {
+    return rows.map(({ employee, presence: p }) => [
+      employee.loginId,
+      employeeName(employee),
+      employee.workEmail,
+      employee.role === "admin" ? "Admin / HR" : "Employee",
+      employee.department,
+      employee.jobTitle,
+      employee.manager,
+      employee.joiningDate,
+      PRESENCE_LABEL[p],
+    ]);
+  }
+
   /** What HR actually asks for: the current view, as a spreadsheet. */
   function exportCsv() {
-    const header = [
-      "Login ID",
-      "Name",
-      "Work email",
-      "Role",
-      "Department",
-      "Job title",
-      "Manager",
-      "Joined",
-      "Status today",
-    ];
-    const body = rows.map(({ employee, presence: p }) =>
-      [
-        employee.loginId,
-        employeeName(employee),
-        employee.workEmail,
-        employee.role,
-        employee.department,
-        employee.jobTitle,
-        employee.manager,
-        employee.joiningDate,
-        PRESENCE_LABEL[p],
-      ]
-        .map(csvCell)
-        .join(","),
-    );
+    downloadCsv(EXPORT_HEADER, exportRows(), `dayflow-employees-${todayISO}`);
+  }
 
-    const blob = new Blob([[header.join(","), ...body].join("\n")], {
-      type: "text/csv;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `dayflow-employees-${todayISO}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  /** The same view as something you can circulate or file. */
+  async function exportPdf() {
+    setExporting(true);
+    try {
+      await downloadReportPdf(
+        {
+          title: "Employee Directory",
+          companyName: COMPANY_NAME,
+          meta: [
+            { label: "Generated", value: generatedAt() },
+            { label: "Scope", value: `${rows.length} of ${counts.total} people` },
+            {
+              label: "Department",
+              value: department === "all" ? "All" : department,
+            },
+            {
+              label: "Role",
+              value:
+                role === "all"
+                  ? "All"
+                  : role === "admin"
+                    ? "Admin / HR"
+                    : "Employee",
+            },
+            {
+              label: "Status",
+              value: presence === "all" ? "Any" : PRESENCE_LABEL[presence],
+            },
+            { label: "Search", value: search || "—" },
+          ],
+          summary: [
+            { label: "Total people", value: String(counts.total) },
+            { label: "In office", value: String(counts.in), tone: "success" },
+            { label: "On leave", value: String(counts.leave) },
+            {
+              label: "Not in",
+              value: String(counts.absent),
+              tone: counts.absent > 0 ? "warn" : "default",
+            },
+            { label: "Admin / HR", value: String(counts.admins) },
+          ],
+          sections: [
+            {
+              title: "People",
+              columns: [
+                { header: "Login ID", width: 1.3 },
+                { header: "Name", width: 1.5 },
+                { header: "Work email", width: 2 },
+                { header: "Role", width: 1 },
+                { header: "Department", width: 1.1 },
+                { header: "Job title", width: 1.4 },
+                { header: "Manager", width: 1.2 },
+                { header: "Joined", width: 1 },
+                { header: "Status today", width: 1.1 },
+              ],
+              rows: exportRows(),
+              emptyLabel: "No employees match the current filters.",
+            },
+          ],
+        },
+        `dayflow-employees-${todayISO}`,
+      );
+    } finally {
+      setExporting(false);
+    }
   }
 
   if (loading) {
@@ -244,9 +310,11 @@ function EmployeesPageInner() {
         description="Add a user and the system generates their Login ID, sets a first password, and emails both."
         actions={
           <>
-            <Button variant="secondary" onClick={exportCsv}>
-              Export CSV
-            </Button>
+            <ExportMenu
+              onCsv={exportCsv}
+              onPdf={exportPdf}
+              busy={exporting}
+            />
             <Button onClick={openAddUser}>Add user</Button>
           </>
         }
