@@ -1,11 +1,37 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Activity } from 'lucide-react'
 import type { Tables } from '@/types/database'
 
 type AutomationLog = Tables<'automation_logs'>
+
+/** Chip styles stay inside the plum hue; only failure leaves it for clay. */
+const TYPE_CHIP: Record<string, string> = {
+  scheduled: 'bg-plum/12 text-primary ring-plum/20',
+  event: 'bg-primary/12 text-primary ring-primary/20',
+  condition: 'bg-warn/10 text-warn ring-warn/20',
+  manual: 'bg-line text-ink/60 ring-ink/10',
+}
+
+const STATUS_CHIP: Record<string, string> = {
+  success: 'bg-success/12 text-success ring-success/25',
+  failed: 'bg-warn/12 text-warn ring-warn/25',
+  skipped: 'bg-line text-ink/55 ring-ink/10',
+  silent: 'bg-transparent text-ink/45 ring-ink/15',
+}
+
+function Chip({ tone, children }: { tone: string; children: React.ReactNode }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-pill px-2.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] ring-1 ring-inset ${tone}`}
+    >
+      {children}
+    </span>
+  )
+}
 
 export default function AutomationsPage() {
   const [logs, setLogs] = useState<AutomationLog[]>([])
@@ -13,11 +39,7 @@ export default function AutomationsPage() {
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
 
-  useEffect(() => {
-    fetchLogs()
-  }, [])
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('automation_logs')
@@ -31,9 +53,13 @@ export default function AutomationsPage() {
       setLogs(data)
     }
     setLoading(false)
-  }
+  }, [])
 
-  const filteredLogs = logs.filter(log => {
+  useEffect(() => {
+    void fetchLogs()
+  }, [fetchLogs])
+
+  const filteredLogs = logs.filter((log) => {
     const matchType = filterType === 'all' || log.trigger_type === filterType
     const matchStatus = filterStatus === 'all' || log.status === filterStatus
     return matchType && matchStatus
@@ -41,124 +67,154 @@ export default function AutomationsPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleString('en-IN', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric', 
-      hour: '2-digit', 
+    return new Date(dateStr).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     })
   }
 
-  const getStatusBadge = (status: string | null) => {
-    switch (status) {
-      case 'success':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-500/15 text-green-400">Success</span>
-      case 'failed':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-500/15 text-red-400">Failed</span>
-      case 'skipped':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/15 text-yellow-400">Skipped</span>
-      case 'silent':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/15 text-gray-400">Silent</span>
-      default:
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/15 text-gray-400">{status}</span>
-    }
-  }
-
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case 'scheduled':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/15 text-blue-400">Scheduled</span>
-      case 'event':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/15 text-purple-400">Event</span>
-      case 'condition':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-500/15 text-orange-400">Condition</span>
-      case 'manual':
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/15 text-gray-400">Manual</span>
-      default:
-        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-500/15 text-gray-400">{type}</span>
-    }
-  }
+  const selectClass =
+    'rounded-pill border border-line bg-paper px-4 py-2 font-display text-sm text-ink ' +
+    'transition-colors hover:border-plum/40 focus:border-plum'
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center gap-2 mb-6">
-          <Activity className="text-indigo-400 w-6 h-6" />
-          <h1 className="text-xl font-bold">Automation Logs</h1>
-        </div>
+    <div className="min-h-screen px-6 py-10">
+      <div className="mx-auto max-w-6xl">
+        <header className="enter mb-8 border-b border-line pb-6">
+          <div className="mb-2 flex items-center justify-between gap-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-plum">
+              Admin · Audit
+            </p>
+            <Link
+              href="/employees"
+              className="font-display text-sm font-semibold text-primary underline-offset-4 hover:underline"
+            >
+              ← Back to Dayflow
+            </Link>
+          </div>
+          <div>
+            <h1 className="flex items-center gap-2.5 font-display text-[32px] font-extrabold leading-[1.08] tracking-[-0.02em] text-ink">
+              <Activity aria-hidden className="h-6 w-6 text-plum" />
+              Automation log
+            </h1>
+            <p className="mt-2 max-w-prose font-body text-[15px] leading-relaxed text-ink/65">
+              Every rule the database ran on its own — what fired, what it
+              changed, and what it deliberately skipped.
+            </p>
+          </div>
+        </header>
 
-        <div className="flex gap-3 mb-4">
-          <select 
+        <div
+          className="enter mb-5 flex flex-wrap items-center gap-3"
+          style={{ '--enter-delay': '60ms' } as React.CSSProperties}
+        >
+          <select
+            aria-label="Filter by trigger type"
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="bg-gray-800 border border-gray-700 text-sm text-white rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+            className={selectClass}
           >
-            <option value="all">All Types</option>
+            <option value="all">All types</option>
             <option value="scheduled">Scheduled</option>
             <option value="event">Event</option>
             <option value="condition">Condition</option>
             <option value="manual">Manual</option>
           </select>
 
-          <select 
+          <select
+            aria-label="Filter by status"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-gray-800 border border-gray-700 text-sm text-white rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+            className={selectClass}
           >
-            <option value="all">All Status</option>
+            <option value="all">All statuses</option>
             <option value="success">Success</option>
             <option value="failed">Failed</option>
             <option value="skipped">Skipped</option>
             <option value="silent">Silent</option>
           </select>
+
+          <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.12em] text-ink/45">
+            {loading
+              ? 'Loading'
+              : `${filteredLogs.length} of ${logs.length} entries`}
+          </span>
         </div>
 
         {loading ? (
-          <div className="text-center text-gray-500 py-10">Loading logs...</div>
+          <div className="space-y-px overflow-hidden rounded-card border border-line">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-14 animate-pulse bg-line/40"
+                style={{ animationDelay: `${i * 70}ms` }}
+              />
+            ))}
+          </div>
         ) : filteredLogs.length === 0 ? (
-          <div className="text-center text-gray-500 py-10">No logs found</div>
+          <div className="rounded-card border border-dashed border-line px-6 py-16 text-center">
+            <p className="font-display text-[17px] font-bold text-ink">
+              Nothing has fired yet
+            </p>
+            <p className="mx-auto mt-2 max-w-sm font-body text-[15px] leading-relaxed text-ink/60">
+              {logs.length === 0
+                ? 'The triggers are installed but no rule has run. Seed the demo data or check someone in to give them something to react to.'
+                : 'No entry matches these filters.'}
+            </p>
+          </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-800">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-900 text-gray-400 text-sm">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Time</th>
-                  <th className="px-4 py-3 font-medium">Type</th>
-                  <th className="px-4 py-3 font-medium">Trigger</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Duration</th>
+          <div className="overflow-x-auto rounded-card border border-line">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-line">
+                  {['Time', 'Type', 'Trigger', 'Action', 'Status', 'Took'].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        scope="col"
+                        className="whitespace-nowrap px-4 py-3 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/55"
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
-                {filteredLogs.map(log => (
-                  <tr key={log.id} className="hover:bg-gray-900/50 transition-colors">
-                    <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
+              <tbody>
+                {filteredLogs.map((log) => (
+                  <tr
+                    key={log.id}
+                    className="border-b border-line/60 transition-colors last:border-0 hover:bg-plum/[0.04]"
+                  >
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-ink/55">
                       {formatDate(log.created_at)}
                     </td>
                     <td className="px-4 py-3">
-                      {getTypeBadge(log.trigger_type)}
+                      <Chip tone={TYPE_CHIP[log.trigger_type] ?? TYPE_CHIP.manual}>
+                        {log.trigger_type}
+                      </Chip>
                     </td>
-                    <td className="px-4 py-3 text-white font-mono text-xs">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-ink">
                       {log.trigger_name}
                     </td>
-                    <td className="px-4 py-3 text-gray-300 text-xs max-w-md">
-                      <div>{log.action_taken}</div>
-                      {log.status === 'failed' && log.error_message && (
-                        <div className="text-red-400 mt-0.5">{log.error_message}</div>
-                      )}
+                    <td className="max-w-md px-4 py-3 font-body text-[14px] leading-snug text-ink/80">
+                      {log.action_taken}
+                      {log.status === 'failed' && log.error_message ? (
+                        <span className="mt-1 block font-mono text-[11px] text-warn">
+                          {log.error_message}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
-                      {getStatusBadge(log.status)}
+                      <Chip tone={STATUS_CHIP[log.status ?? ''] ?? STATUS_CHIP.skipped}>
+                        {log.status ?? 'unknown'}
+                      </Chip>
                     </td>
-                    <td className="px-4 py-3">
-                      {log.execution_ms !== null ? (
-                        <span className="text-gray-500 text-xs">{log.execution_ms}ms</span>
-                      ) : (
-                        <span className="text-gray-700 text-xs">—</span>
-                      )}
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-[11px] text-ink/50">
+                      {log.execution_ms !== null ? `${log.execution_ms} ms` : '—'}
                     </td>
                   </tr>
                 ))}
