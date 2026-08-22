@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Database } from "@/types/database";
 
-/** RLS-scoped client: every query runs as the signed-in employee. */
+/** RLS-scoped client: every query runs as the signed-in user. */
 export async function supabaseServer() {
   const cookieStore = await cookies();
   return createServerClient<Database>(
@@ -37,7 +37,7 @@ async function getSessionContext() {
   } = await sb.auth.getUser();
   if (!user) return null;
   const { data: profile } = await sb
-    .from("employees")
+    .from("profiles")
     .select("*")
     .eq("id", user.id)
     .single();
@@ -56,7 +56,7 @@ type AsyncReturnType<T extends () => unknown> = T extends () => Promise<infer R>
 export async function requireSession(opts?: { admin?: boolean }) {
   const ctx = await getSessionContext();
   if (!ctx) redirect("/sign-in");
-  if (ctx.profile.must_change_password) redirect("/change-password");
+  // No forced password change yet: profiles has no must_change_password column.
   if (opts?.admin && ctx.profile.role !== "admin") redirect("/employees");
   return { sb: ctx.sb, user: ctx.user, me: ctx.profile };
 }

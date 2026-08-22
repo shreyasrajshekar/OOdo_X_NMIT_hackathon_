@@ -1,482 +1,591 @@
-// Handwritten mirror of supabase/migrations/*.sql.
-// Regenerate against a live project when convenient:
-//   npx supabase gen types typescript --project-id <ref> > src/types/database.ts
-// Shape follows supabase-js v2 generated conventions.
-
 export type Json =
   | string
   | number
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[];
+  | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
   public: {
     Tables: {
-      companies: {
-        Row: {
-          id: string;
-          name: string;
-          code: string;
-          logo_url: string | null;
-          created_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          code: string;
-          logo_url?: string | null;
-          created_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["companies"]["Insert"]>;
-        Relationships: [];
-      };
-      employees: {
-        Row: {
-          id: string;
-          company_id: string;
-          login_id: string;
-          first_name: string;
-          last_name: string;
-          work_email: string;
-          personal_email: string | null;
-          phone: string | null;
-          role: Database["public"]["Enums"]["app_role"];
-          manager_id: string | null;
-          department: string | null;
-          job_title: string | null;
-          joining_date: string;
-          dob: string | null;
-          gender: string | null;
-          marital_status: string | null;
-          nationality: string | null;
-          address: string | null;
-          avatar_url: string | null;
-          bank_account_no: string | null;
-          bank_name: string | null;
-          ifsc_code: string | null;
-          pan_no: string | null;
-          uan_no: string | null;
-          esic_code: string | null;
-          must_change_password: boolean;
-          is_active: boolean;
-          created_at: string | null;
-        };
-        Insert: {
-          id: string;
-          company_id: string;
-          login_id: string;
-          first_name: string;
-          last_name: string;
-          work_email: string;
-          personal_email?: string | null;
-          phone?: string | null;
-          role?: Database["public"]["Enums"]["app_role"];
-          manager_id?: string | null;
-          department?: string | null;
-          job_title?: string | null;
-          joining_date: string;
-          dob?: string | null;
-          gender?: string | null;
-          marital_status?: string | null;
-          nationality?: string | null;
-          address?: string | null;
-          avatar_url?: string | null;
-          bank_account_no?: string | null;
-          bank_name?: string | null;
-          ifsc_code?: string | null;
-          pan_no?: string | null;
-          uan_no?: string | null;
-          esic_code?: string | null;
-          must_change_password?: boolean;
-          is_active?: boolean;
-        };
-        Update: Partial<Database["public"]["Tables"]["employees"]["Insert"]>;
-        Relationships: [];
-      };
-      employee_resume: {
-        Row: {
-          employee_id: string;
-          about: string | null;
-          love_about_job: string | null;
-          interests: string | null;
-          skills: Json | null;
-          certifications: Json | null;
-        };
-        Insert: {
-          employee_id: string;
-          about?: string | null;
-          love_about_job?: string | null;
-          interests?: string | null;
-          skills?: Json | null;
-          certifications?: Json | null;
-        };
-        Update: Partial<
-          Database["public"]["Tables"]["employee_resume"]["Insert"]
-        >;
-          Relationships: [],
-      };
-      payroll_config: {
-        Row: {
-          company_id: string;
-          pf_employee_rate: number;
-          pf_employer_rate: number;
-          professional_tax: number;
-          pf_wage_ceiling: number | null;
-          sandwich_unpaid_leaves: boolean;
-        };
-        Insert: {
-          company_id: string;
-          pf_employee_rate?: number;
-          pf_employer_rate?: number;
-          professional_tax?: number;
-          pf_wage_ceiling?: number | null;
-          sandwich_unpaid_leaves?: boolean;
-        };
-        Update: Partial<
-          Database["public"]["Tables"]["payroll_config"]["Insert"]
-        >;
-          Relationships: [],
-      };
-      salary_structures: {
-        Row: {
-          id: string;
-          employee_id: string;
-          wage_type: string;
-          monthly_wage: number;
-          yearly_wage: number;
-          working_days_month: number;
-          break_hours: number | null;
-          effective_from: string;
-          is_current: boolean;
-          created_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          employee_id: string;
-          wage_type?: string;
-          monthly_wage: number;
-          working_days_month?: number;
-          break_hours?: number | null;
-          effective_from?: string;
-          is_current?: boolean;
-        };
-        Update: Partial<
-          Database["public"]["Tables"]["salary_structures"]["Insert"]
-        >;
-          Relationships: [],
-      };
-      salary_components: {
-        Row: {
-          id: string;
-          structure_id: string;
-          code: string;
-          name: string;
-          computation: Database["public"]["Enums"]["computation_type"];
-          percent_value: number | null;
-          base_component_code: string | null;
-          fixed_amount: number | null;
-          sequence: number;
-        };
-        Insert: {
-          id?: string;
-          structure_id: string;
-          code: string;
-          name: string;
-          computation: Database["public"]["Enums"]["computation_type"];
-          percent_value?: number | null;
-          base_component_code?: string | null;
-          fixed_amount?: number | null;
-          sequence: number;
-        };
-        Update: Partial<
-          Database["public"]["Tables"]["salary_components"]["Insert"]
-        >;
-          Relationships: [],
-      };
-      holidays: {
-        Row: {
-          id: string;
-          company_id: string;
-          holiday_date: string;
-          name: string;
-        };
-        Insert: {
-          id?: string;
-          company_id: string;
-          holiday_date: string;
-          name: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["holidays"]["Insert"]>;
-        Relationships: [];
-      };
       attendance: {
         Row: {
-          id: string;
-          employee_id: string;
-          work_date: string;
-          check_in: string | null;
-          check_out: string | null;
-          work_hours: number | null;
-          extra_hours: number | null;
-          status: Database["public"]["Enums"]["attendance_status"];
-          is_anomaly: boolean;
-          notes: string | null;
-        };
+          check_in: string | null
+          check_out: string | null
+          created_at: string | null
+          date: string
+          employee_id: string
+          hours_worked: number | null
+          id: number
+          note: string | null
+          status: string
+        }
         Insert: {
-          id?: string;
-          employee_id: string;
-          work_date: string;
-          check_in?: string | null;
-          check_out?: string | null;
-          work_hours?: number | null;
-          extra_hours?: number | null;
-          status?: Database["public"]["Enums"]["attendance_status"];
-          is_anomaly?: boolean;
-          notes?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["attendance"]["Insert"]>;
-        Relationships: [];
-      };
-      regularization_requests: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date: string
+          employee_id: string
+          hours_worked?: number | null
+          id?: number
+          note?: string | null
+          status?: string
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string
+          employee_id?: string
+          hours_worked?: number | null
+          id?: number
+          note?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_logs: {
         Row: {
-          id: string;
-          attendance_id: string;
-          employee_id: string;
-          proposed_check_in: string | null;
-          proposed_check_out: string | null;
-          reason: string;
-          status: Database["public"]["Enums"]["request_status"];
-          reviewed_by: string | null;
-          review_comment: string | null;
-          created_at: string | null;
-        };
+          action_taken: string
+          cascade_id: string | null
+          created_at: string | null
+          entity_id: number | null
+          entity_type: string | null
+          error_message: string | null
+          execution_ms: number | null
+          id: number
+          status: string | null
+          trigger_name: string
+          trigger_type: string
+          undo_sql: string | null
+          undone: boolean | null
+        }
         Insert: {
-          id?: string;
-          attendance_id: string;
-          employee_id: string;
-          proposed_check_in?: string | null;
-          proposed_check_out?: string | null;
-          reason: string;
-          status?: Database["public"]["Enums"]["request_status"];
-          reviewed_by?: string | null;
-          review_comment?: string | null;
-        };
-        Update: Partial<
-          Database["public"]["Tables"]["regularization_requests"]["Insert"]
-        >;
-          Relationships: [],
-      };
-      leave_types: {
+          action_taken: string
+          cascade_id?: string | null
+          created_at?: string | null
+          entity_id?: number | null
+          entity_type?: string | null
+          error_message?: string | null
+          execution_ms?: number | null
+          id?: number
+          status?: string | null
+          trigger_name: string
+          trigger_type: string
+          undo_sql?: string | null
+          undone?: boolean | null
+        }
+        Update: {
+          action_taken?: string
+          cascade_id?: string | null
+          created_at?: string | null
+          entity_id?: number | null
+          entity_type?: string | null
+          error_message?: string | null
+          execution_ms?: number | null
+          id?: number
+          status?: string | null
+          trigger_name?: string
+          trigger_type?: string
+          undo_sql?: string | null
+          undone?: boolean | null
+        }
+        Relationships: []
+      }
+      leave_balance: {
         Row: {
-          id: string;
-          company_id: string;
-          code: string;
-          name: string;
-          is_paid: boolean;
-          requires_attachment: boolean;
-        };
+          casual_leave: number | null
+          created_at: string | null
+          employee_id: string
+          id: number
+          paid_leave: number | null
+          sick_leave: number | null
+          unpaid_leave: number | null
+          updated_at: string | null
+          year: number
+        }
         Insert: {
-          id?: string;
-          company_id: string;
-          code: string;
-          name: string;
-          is_paid?: boolean;
-          requires_attachment?: boolean;
-        };
-        Update: Partial<Database["public"]["Tables"]["leave_types"]["Insert"]>;
-        Relationships: [];
-      };
-      leave_allocations: {
-        Row: {
-          id: string;
-          employee_id: string;
-          leave_type_id: string;
-          days: number;
-          valid_from: string;
-          valid_to: string;
-          note: string | null;
-          allocated_by: string | null;
-          created_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          employee_id: string;
-          leave_type_id: string;
-          days: number;
-          valid_from: string;
-          valid_to: string;
-          note?: string | null;
-          allocated_by?: string | null;
-        };
-        Update: Partial<
-          Database["public"]["Tables"]["leave_allocations"]["Insert"]
-        >;
-          Relationships: [],
-      };
+          casual_leave?: number | null
+          created_at?: string | null
+          employee_id: string
+          id?: number
+          paid_leave?: number | null
+          sick_leave?: number | null
+          unpaid_leave?: number | null
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          casual_leave?: number | null
+          created_at?: string | null
+          employee_id?: string
+          id?: number
+          paid_leave?: number | null
+          sick_leave?: number | null
+          unpaid_leave?: number | null
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_balance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
-          id: string;
-          employee_id: string;
-          leave_type_id: string;
-          start_date: string;
-          end_date: string;
-          day_count: number;
-          remarks: string | null;
-          attachment_url: string | null;
-          status: Database["public"]["Enums"]["request_status"];
-          reviewed_by: string | null;
-          review_comment: string | null;
-          reviewed_at: string | null;
-          created_at: string | null;
-        };
+          admin_comment: string | null
+          approved_by: string | null
+          created_at: string | null
+          employee_id: string
+          from_date: string
+          id: number
+          leave_type: string
+          reason: string
+          status: string
+          to_date: string
+          total_days: number
+          updated_at: string | null
+        }
         Insert: {
-          id?: string;
-          employee_id: string;
-          leave_type_id: string;
-          start_date: string;
-          end_date: string;
-          day_count: number;
-          remarks?: string | null;
-          attachment_url?: string | null;
-          status?: Database["public"]["Enums"]["request_status"];
-          reviewed_by?: string | null;
-          review_comment?: string | null;
-          reviewed_at?: string | null;
-        };
-        Update: Partial<
-          Database["public"]["Tables"]["leave_requests"]["Insert"]
-        >;
-          Relationships: [],
-      };
-      payslips: {
+          admin_comment?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          employee_id: string
+          from_date: string
+          id?: number
+          leave_type: string
+          reason: string
+          status?: string
+          to_date: string
+          total_days: number
+          updated_at?: string | null
+        }
+        Update: {
+          admin_comment?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          employee_id?: string
+          from_date?: string
+          id?: number
+          leave_type?: string
+          reason?: string
+          status?: string
+          to_date?: string
+          total_days?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_caps: {
         Row: {
-          id: string;
-          employee_id: string;
-          period_start: string;
-          period_end: string;
-          working_days: number;
-          payable_days: number;
-          lop_days: number;
-          earnings: Json;
-          deductions: Json;
-          gross: number;
-          total_deduct: number;
-          net_pay: number;
-          pdf_url: string | null;
-          generated_at: string | null;
-        };
+          cooldown_hours: number
+          description: string | null
+          type: string
+        }
         Insert: {
-          id?: string;
-          employee_id: string;
-          period_start: string;
-          period_end: string;
-          working_days: number;
-          payable_days: number;
-          lop_days?: number;
-          earnings: Json;
-          deductions: Json;
-          gross: number;
-          total_deduct: number;
-          net_pay: number;
-          pdf_url?: string | null;
-          generated_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["payslips"]["Insert"]>;
-        Relationships: [];
-      };
-      audit_log: {
+          cooldown_hours: number
+          description?: string | null
+          type: string
+        }
+        Update: {
+          cooldown_hours?: number
+          description?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
+      notification_logs: {
         Row: {
-          id: number;
-          company_id: string;
-          actor_id: string | null;
-          entity: string;
-          entity_id: string;
-          field: string;
-          old_value: string | null;
-          new_value: string | null;
-          changed_at: string | null;
-        };
+          id: string
+          sent_at: string | null
+          type: string
+          user_id: string
+        }
         Insert: {
-          id?: number;
-          company_id: string;
-          actor_id?: string | null;
-          entity: string;
-          entity_id: string;
-          field: string;
-          old_value?: string | null;
-          new_value?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["audit_log"]["Insert"]>;
-        Relationships: [];
-      };
-    };
+          id?: string
+          sent_at?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          sent_at?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          cascade_id: string | null
+          created_at: string | null
+          id: number
+          is_read: boolean | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          cascade_id?: string | null
+          created_at?: string | null
+          id?: number
+          is_read?: boolean | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          cascade_id?: string | null
+          created_at?: string | null
+          id?: number
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          department: string | null
+          first_name: string
+          id: string
+          is_active: boolean | null
+          join_date: string | null
+          last_name: string
+          phone: string | null
+          position: string | null
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          department?: string | null
+          first_name: string
+          id: string
+          is_active?: boolean | null
+          join_date?: string | null
+          last_name: string
+          phone?: string | null
+          position?: string | null
+          role?: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          department?: string | null
+          first_name?: string
+          id?: string
+          is_active?: boolean | null
+          join_date?: string | null
+          last_name?: string
+          phone?: string | null
+          position?: string | null
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      salary_records: {
+        Row: {
+          allowance: number
+          basic: number
+          created_at: string | null
+          da: number
+          employee_id: string
+          hra: number
+          id: number
+          month: number
+          net_pay: number
+          other_deduction: number | null
+          paid_on: string | null
+          pf_deduction: number | null
+          status: string | null
+          tax_deduction: number | null
+          year: number
+        }
+        Insert: {
+          allowance: number
+          basic: number
+          created_at?: string | null
+          da: number
+          employee_id: string
+          hra: number
+          id?: number
+          month: number
+          net_pay: number
+          other_deduction?: number | null
+          paid_on?: string | null
+          pf_deduction?: number | null
+          status?: string | null
+          tax_deduction?: number | null
+          year: number
+        }
+        Update: {
+          allowance?: number
+          basic?: number
+          created_at?: string | null
+          da?: number
+          employee_id?: string
+          hra?: number
+          id?: number
+          month?: number
+          net_pay?: number
+          other_deduction?: number | null
+          paid_on?: string | null
+          pf_deduction?: number | null
+          status?: string | null
+          tax_deduction?: number | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      salary_structure: {
+        Row: {
+          allowance: number
+          basic: number
+          da: number
+          employee_id: string
+          hra: number
+          id: number
+          pf_rate: number | null
+          tax_rate: number | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          allowance: number
+          basic: number
+          da: number
+          employee_id: string
+          hra: number
+          id?: number
+          pf_rate?: number | null
+          tax_rate?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          allowance?: number
+          basic?: number
+          da?: number
+          employee_id?: string
+          hra?: number
+          id?: number
+          pf_rate?: number | null
+          tax_rate?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_structure_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_structure_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
     Views: {
-      leave_balances: {
-        Row: {
-          employee_id: string;
-          leave_type_id: string;
-          allocated: number | null;
-          taken: number | null;
-          available: number | null;
-        };
-        Relationships: [];
-      };
-    };
+      [_ in never]: never
+    }
     Functions: {
-      auth_role: { Args: Record<string, never>; Returns: Database["public"]["Enums"]["app_role"] };
-      auth_company: { Args: Record<string, never>; Returns: string };
-      generate_login_id: {
-        Args: {
-          p_company_id: string;
-          p_first_name: string;
-          p_last_name: string;
-          p_joining_date: string;
-        };
-        Returns: string;
-      };
-      lookup_email_for_identifier: {
-        Args: { p_identifier: string };
-        Returns: string;
-      };
-      complete_password_change: { Args: Record<string, never>; Returns: undefined };
-      do_check_in: { Args: Record<string, never>; Returns: undefined };
-      do_check_out: { Args: Record<string, never>; Returns: undefined };
-      replace_salary_components: {
-        Args: { p_structure_id: string; p_components: Json };
-        Returns: undefined;
-      };
-      audit_history_for_employee: {
-        Args: { p_employee_id: string };
-        Returns: {
-          field: string;
-          old_value: string | null;
-          new_value: string | null;
-          changed_at: string | null;
-          actor: string | null;
-          entity: string;
-        }[];
-      };
-    };
+      should_notify: {
+        Args: { p_type: string; p_user_id: string }
+        Returns: boolean
+      }
+    }
     Enums: {
-      app_role: "admin" | "employee";
-      attendance_status:
-        | "present"
-        | "absent"
-        | "half_day"
-        | "leave"
-        | "holiday"
-        | "weekend";
-      request_status: "pending" | "approved" | "rejected";
-      computation_type:
-        | "fixed"
-        | "percent_of_wage"
-        | "percent_of_component"
-        | "balance";
-    };
-  };
-};
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
 
-export type Tables<T extends keyof Database["public"]["Tables"]> =
-  Database["public"]["Tables"][T]["Row"];
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
