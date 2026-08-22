@@ -6,7 +6,10 @@ import { Field, inputClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { generateLoginId, nextSerial } from "@/lib/login-id";
 import { generateTempPassword } from "@/lib/password";
-import { createEmployeeAccount } from "@/app/actions/employees";
+import {
+  createEmployeeAccount,
+  resendEmployeeCredentials,
+} from "@/app/actions/employees";
 import { fetchCompanyName } from "@/lib/supabase-db";
 import {
   COMPANY_NAME,
@@ -42,6 +45,9 @@ const EMPTY_FORM: FormState = {
 };
 
 type Created = {
+  /** Needed to reset the password when HR resends. */
+  userId?: string;
+  firstName: string;
   loginId: string;
   tempPassword: string;
   email: string;
@@ -69,6 +75,8 @@ export function NewEmployeeModal({
   const [errorMsg, setErrorMsg] = useState("");
   const [companyName, setCompanyName] = useState(COMPANY_NAME);
   const [copied, setCopied] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendNote, setResendNote] = useState("");
 
   useEffect(() => {
     if (!open) {
@@ -167,6 +175,8 @@ export function NewEmployeeModal({
 
       onCreated(savedEmp);
       setCreated({
+        userId: account.userId,
+        firstName: form.firstName.trim(),
         loginId,
         tempPassword,
         email: form.workEmail.trim(),
@@ -224,18 +234,81 @@ export function NewEmployeeModal({
             </p>
           </div>
 
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              navigator.clipboard?.writeText(
-                `Login ID: ${created.loginId}\nPassword: ${created.tempPassword}`,
-              );
-              setCopied(true);
-            }}
-          >
-            {copied ? "Copied" : "Copy credentials"}
-          </Button>
+          {/* Always offered, even on a successful send: "sent" only means
+              Resend accepted it. Spam filters, typo'd addresses and unverified
+              sender domains all end with the employee having no credentials
+              and HR believing they were delivered. */}
+          <div className="rounded-card border border-line bg-line/20 p-4">
+            <p className="font-display text-sm font-semibold text-ink">
+              {created.emailSent ? "Didn't arrive?" : "Pass these on yourself"}
+            </p>
+            <p className="mt-1 font-body text-[15px] text-ink/70">
+              {created.emailSent
+                ? "Check their spam folder first. You can resend with a fresh password, or hand the details over directly."
+                : "Copy the credentials above and give them to the employee through a channel you trust."}
+            </p>
+
+            {resendNote && (
+              <p className="mt-3 font-body text-[15px] text-plum">{resendNote}</p>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  navigator.clipboard?.writeText(
+                    `Login ID: ${created.loginId}\nPassword: ${created.tempPassword}\nSign in: ${
+                      process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+                    }/sign-in`,
+                  );
+                  setCopied(true);
+                }}
+              >
+                {copied ? "Copied" : "Copy credentials"}
+              </Button>
+
+              {created.userId && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={resending}
+                  onClick={async () => {
+                    setResending(true);
+                    setResendNote("");
+                    // A resend issues a *new* password: the old one is
+                    // overwritten in Auth, so the panel above has to show the
+                    // new value or HR would read out a dead password.
+                    const nextPassword = generateTempPassword();
+                    const r = await resendEmployeeCredentials({
+                      userId: created.userId!,
+                      email: created.email,
+                      firstName: created.firstName,
+                      loginId: created.loginId,
+                      companyName,
+                      password: nextPassword,
+                    });
+                    setCreated({
+                      ...created,
+                      tempPassword: nextPassword,
+                      emailSent: r.emailSent,
+                      emailError: r.emailError,
+                    });
+                    setCopied(false);
+                    setResendNote(
+                      r.emailSent
+                        ? `Resent to ${created.email} with a new password — the one above is current.`
+                        : `Still not sending: ${r.emailError || "unknown mail error"}. The password above has been reset, so use that one.`,
+                    );
+                    setResending(false);
+                  }}
+                >
+                  {resending ? "Resending…" : "Resend email"}
+                </Button>
+              )}
+            </div>
+          </div>
+
           <Button type="button" onClick={onClose}>
             Done
           </Button>
