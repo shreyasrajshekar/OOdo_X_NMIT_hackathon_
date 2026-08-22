@@ -22,8 +22,20 @@ supabase db push
 npm run seed        # 25 people, a month of attendance, one pending unpaid leave
 ```
 
-`npm run seed` needs the service-role key. `profiles.id` is a foreign key onto
-`auth.users(id)`, so people can only be created through the admin auth API.
+**Seeding without the service-role key.** `npm run seed` goes through the admin
+auth API, which needs `SUPABASE_SERVICE_ROLE_KEY`. If you don't have it, paste
+[`seed/demo_data.sql`](seed/demo_data.sql) into the SQL editor instead — it
+creates the `auth.users` rows directly and produces the same dataset.
+
+Either way you get 25 people (1 admin, 24 across four departments), a month of
+attendance with late arrivals, missed check-outs, half days and one employee
+carrying three consecutive absences, plus one **pending unpaid leave request**
+left sitting in the admin queue for the demo.
+
+Both are idempotent and keyed on the seed email domain
+(`@odooindia.dayflow.test`), so re-running replaces only the demo people and
+leaves any real accounts alone. Every seeded account shares the password
+`Dayflow!2026`.
 
 ## Migrations
 

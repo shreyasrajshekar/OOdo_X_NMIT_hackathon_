@@ -49,6 +49,7 @@ has no `login_id` column yet. See [Next steps](#next-steps).
 npm install
 cp .env.example .env.local    # fill in from the Supabase dashboard
 npm run seed                  # optional: 25 people and a month of attendance
+                              # no service-role key? paste supabase/seed/demo_data.sql instead
 npm run dev
 ```
 
