@@ -1,20 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import type { Tables } from '@/types/database'
 import { Bell } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-interface Notification {
-  id: number
-  type: string
-  title: string
-  message: string
-  is_read: boolean
-  action_url: string | null
-  created_at: string
-}
+type Notification = Tables<'notifications'>
 
-function timeAgo(dateString: string) {
+function timeAgo(dateString: string | null) {
+  if (!dateString) return ''
   const date = new Date(dateString)
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
 
