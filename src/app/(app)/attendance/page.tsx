@@ -6,6 +6,12 @@ import { AdminGuard } from "@/components/admin-guard";
 import { supabase } from "@/lib/supabase";
 import { fetchAttendanceRecords, fetchEmployees } from "@/lib/supabase-db";
 import {
+  downloadCsv,
+  downloadReportPdf,
+  generatedAt,
+} from "@/lib/pdf/export-report";
+import {
+  COMPANY_NAME,
   DEPARTMENTS,
   employeeInitials,
   employeeName,
@@ -16,9 +22,9 @@ import {
   type AttendanceStatus,
   type AttendanceRecord,
 } from "@/lib/mock-data";
-import { Button } from "@/components/ui/button";
 import {
   EmptyState,
+  ExportMenu,
   FilterSelect,
   MiniBar,
   PageHeader,
@@ -128,6 +134,7 @@ function AdminAttendance() {
   const [dbRecords, setDbRecords] = useState<DbAttendanceRow[]>([]);
   const [roster, setRoster] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchEmployees()
@@ -244,46 +251,171 @@ function AdminAttendance() {
     setStatusFilter("all");
   }
 
-  function exportCsv() {
-    const header = [
-      "Login ID",
-      "Name",
-      "Department",
-      "Date",
-      "Check in",
-      "Check out",
-      "Work hours",
-      "Extra hours",
-      "Status",
-    ];
-    const body = filtered.map(({ employee, record }) =>
-      [
+  const DAY_HEADER = [
+    "Login ID",
+    "Name",
+    "Department",
+    "Date",
+    "Check in",
+    "Check out",
+    "Work hours",
+    "Extra hours",
+    "Status",
+  ];
+
+  function dayExportRows() {
+    return filtered.map(({ employee, record }) => [
+      employee.loginId,
+      employeeName(employee),
+      employee.department,
+      selectedDate,
+      formatTime(record.checkIn),
+      formatTime(record.checkOut),
+      record.workHours ? record.workHours.toFixed(1) : "0.0",
+      record.extraHours ? record.extraHours.toFixed(1) : "0.0",
+      STATUS_LABEL[record.status],
+    ]);
+  }
+
+  const RANGE_HEADER = [
+    "Login ID",
+    "Name",
+    "Department",
+    "Present",
+    "Half day",
+    "Absent",
+    "Leave",
+    "Days tracked",
+    "Attendance %",
+  ];
+
+  function rangeExportRows() {
+    return filtered.map(({ employee }) => {
+      const records = range.map((d) =>
+        getAttendanceRecord(employee, d, today()),
+      );
+      const count = (status: AttendanceStatus) =>
+        records.filter((r) => r.status === status).length;
+      const worked = count("present") + count("half_day") * 0.5;
+      const trackable = records.filter(
+        (r) => r.status !== "weekend" && r.status !== "holiday",
+      ).length;
+
+      return [
         employee.loginId,
         employeeName(employee),
         employee.department,
-        selectedDate,
-        formatTime(record.checkIn),
-        formatTime(record.checkOut),
-        record.workHours || 0,
-        record.extraHours || 0,
-        STATUS_LABEL[record.status],
-      ]
-        .map((cell) => {
-          const text = String(cell ?? "");
-          return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-        })
-        .join(","),
-    );
-
-    const blob = new Blob([[header.join(","), ...body].join("\n")], {
-      type: "text/csv;charset=utf-8",
+        String(count("present")),
+        String(count("half_day")),
+        String(count("absent")),
+        String(count("leave")),
+        String(range.length),
+        trackable > 0 ? `${Math.round((worked / trackable) * 100)}%` : "—",
+      ];
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `dayflow-attendance-${selectedDate}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  }
+
+  function exportCsv() {
+    const isDay = view === "day";
+    downloadCsv(
+      isDay ? DAY_HEADER : RANGE_HEADER,
+      isDay ? dayExportRows() : rangeExportRows(),
+      `dayflow-attendance-${view}-${selectedDate}`,
+    );
+  }
+
+  async function exportPdf() {
+    setExporting(true);
+    const isDay = view === "day";
+
+    try {
+      await downloadReportPdf(
+        {
+          title: isDay ? "Daily Attendance" : `Attendance — ${view} summary`,
+          companyName: COMPANY_NAME,
+          meta: [
+            { label: "Generated", value: generatedAt() },
+            {
+              label: "Period",
+              value: isDay
+                ? formatDate(selectedDate)
+                : `${range.length} days to ${formatDate(selectedDate)}`,
+            },
+            {
+              label: "Department",
+              value: department === "all" ? "All" : department,
+            },
+            {
+              label: "Status",
+              value:
+                statusFilter === "all" ? "Any" : STATUS_LABEL[statusFilter],
+            },
+            { label: "Search", value: search || "—" },
+            { label: "People", value: `${filtered.length} of ${roster.length}` },
+          ],
+          summary: isDay
+            ? [
+                {
+                  label: "Present",
+                  value: String(counts.present),
+                  tone: "success",
+                },
+                { label: "Half day", value: String(counts.half_day) },
+                { label: "On leave", value: String(counts.leave) },
+                {
+                  label: "Absent",
+                  value: String(counts.absent),
+                  tone: counts.absent > 0 ? "warn" : "default",
+                },
+                { label: "Avg hours", value: counts.avgHours },
+                { label: "Total hours", value: counts.totalHours },
+              ]
+            : undefined,
+          sections: [
+            isDay
+              ? {
+                  title: "Attendance log",
+                  columns: [
+                    { header: "Login ID", width: 1.3 },
+                    { header: "Name", width: 1.5 },
+                    { header: "Department", width: 1.1 },
+                    { header: "Date", width: 1 },
+                    { header: "Check in", width: 1, align: "right" as const },
+                    { header: "Check out", width: 1, align: "right" as const },
+                    { header: "Hours", width: 0.8, align: "right" as const },
+                    { header: "Extra", width: 0.8, align: "right" as const },
+                    { header: "Status", width: 1 },
+                  ],
+                  rows: dayExportRows(),
+                  emptyLabel: "No attendance rows for this day.",
+                }
+              : {
+                  title: `Per-person totals · ${range.length} days`,
+                  columns: [
+                    { header: "Login ID", width: 1.3 },
+                    { header: "Name", width: 1.6 },
+                    { header: "Department", width: 1.2 },
+                    { header: "Present", width: 0.8, align: "right" as const },
+                    { header: "Half day", width: 0.8, align: "right" as const },
+                    { header: "Absent", width: 0.8, align: "right" as const },
+                    { header: "Leave", width: 0.8, align: "right" as const },
+                    { header: "Days", width: 0.8, align: "right" as const },
+                    {
+                      header: "Attendance",
+                      width: 1,
+                      align: "right" as const,
+                    },
+                  ],
+                  rows: rangeExportRows(),
+                  emptyLabel: "No people match the current filters.",
+                },
+          ],
+        },
+        `dayflow-attendance-${view}-${selectedDate}`,
+      );
+    } finally {
+      setExporting(false);
+    }
   }
 
   if (loading) {
@@ -324,9 +456,7 @@ function AdminAttendance() {
               className="h-9 rounded-pill border border-line bg-paper px-3 font-display text-sm text-ink focus:border-plum"
             />
           </Stepper>
-          <Button variant="secondary" onClick={exportCsv}>
-            Export CSV
-          </Button>
+          <ExportMenu onCsv={exportCsv} onPdf={exportPdf} busy={exporting} />
         </div>
       </div>
 

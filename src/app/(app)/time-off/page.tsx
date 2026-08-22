@@ -9,6 +9,7 @@ import { AllocationPanel } from "@/components/time-off/allocation-panel";
 import { TimeOffRequestModal } from "@/components/time-off/request-modal";
 import { CalendarLegend, YearCalendar } from "@/components/time-off/year-calendar";
 import {
+  COMPANY_NAME,
   HOLIDAYS,
   LEAVE_TYPES,
   employeeInitials,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/mock-data";
 import {
   EmptyState,
+  ExportMenu,
   FilterSelect,
   PageHeader,
   PersonCell,
@@ -34,6 +36,11 @@ import {
   type Tone,
 } from "@/components/ui/data-ui";
 import { fetchEmployees, fetchLeaveRequests, fetchLeaveAllocations, updateLeaveRequestStatus } from "@/lib/supabase-db";
+import {
+  downloadCsv,
+  downloadReportPdf,
+  generatedAt,
+} from "@/lib/pdf/export-report";
 
 /** Employee-side table still styles status as text. */
 const STATUS_STYLE: Record<RequestStatus, string> = {
@@ -65,6 +72,7 @@ function AdminTimeOff() {
   const [roster, setRoster] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RequestStatus>(
@@ -146,6 +154,106 @@ function AdminTimeOff() {
       });
   }, [requests, roster, search, statusFilter, typeFilter]);
 
+  const EXPORT_HEADER = [
+    "Login ID",
+    "Employee",
+    "Leave type",
+    "Start",
+    "End",
+    "Days",
+    "Reason",
+    "Status",
+  ];
+
+  function exportRows() {
+    return rows.map(({ request, employee }) => [
+      employee?.loginId ?? "—",
+      employee ? employeeName(employee) : request.employeeId,
+      LEAVE_TYPES.find((t) => t.code === request.leaveType)?.name ??
+        request.leaveType,
+      request.startDate,
+      request.endDate,
+      String(request.dayCount),
+      request.remarks || "—",
+      request.status.charAt(0).toUpperCase() + request.status.slice(1),
+    ]);
+  }
+
+  function exportCsv() {
+    downloadCsv(EXPORT_HEADER, exportRows(), "dayflow-time-off");
+  }
+
+  async function exportPdf() {
+    setExporting(true);
+    try {
+      await downloadReportPdf(
+        {
+          title: "Time Off Register",
+          companyName: COMPANY_NAME,
+          meta: [
+            { label: "Generated", value: generatedAt() },
+            {
+              label: "Status",
+              value:
+                statusFilter === "all"
+                  ? "Any"
+                  : statusFilter.charAt(0).toUpperCase() +
+                    statusFilter.slice(1),
+            },
+            {
+              label: "Leave type",
+              value:
+                typeFilter === "all"
+                  ? "All"
+                  : (LEAVE_TYPES.find((t) => t.code === typeFilter)?.name ??
+                    typeFilter),
+            },
+            { label: "Search", value: search || "—" },
+            {
+              label: "Scope",
+              value: `${rows.length} of ${requests.length} requests`,
+            },
+          ],
+          summary: [
+            {
+              label: "Awaiting review",
+              value: String(counts.pending),
+              tone: counts.pending > 0 ? "warn" : "default",
+            },
+            {
+              label: "Approved",
+              value: String(counts.approved),
+              tone: "success",
+            },
+            { label: "Rejected", value: String(counts.rejected) },
+            { label: "Days pending", value: String(counts.days) },
+          ],
+          sections: [
+            {
+              title: "Requests",
+              note: "Pending requests are listed first.",
+              columns: [
+                { header: "Login ID", width: 1.2 },
+                { header: "Employee", width: 1.5 },
+                { header: "Leave type", width: 1.2 },
+                { header: "Start", width: 1 },
+                { header: "End", width: 1 },
+                { header: "Days", width: 0.6, align: "right" as const },
+                { header: "Reason", width: 2.2 },
+                { header: "Status", width: 1 },
+              ],
+              rows: exportRows(),
+              emptyLabel: "No requests match the current filters.",
+            },
+          ],
+        },
+        "dayflow-time-off",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const filtersOn =
     Boolean(search) || statusFilter !== "all" || typeFilter !== "all";
 
@@ -167,14 +275,19 @@ function AdminTimeOff() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Tabs
-        active={tab}
-        onChange={(key) => setTab(key as "requests" | "allocation")}
-        tabs={[
-          { key: "requests", label: "Requests" },
-          { key: "allocation", label: "Allocation" },
-        ]}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          active={tab}
+          onChange={(key) => setTab(key as "requests" | "allocation")}
+          tabs={[
+            { key: "requests", label: "Requests" },
+            { key: "allocation", label: "Allocation" },
+          ]}
+        />
+        {tab === "requests" && (
+          <ExportMenu onCsv={exportCsv} onPdf={exportPdf} busy={exporting} />
+        )}
+      </div>
 
       {tab === "requests" ? (
         <>

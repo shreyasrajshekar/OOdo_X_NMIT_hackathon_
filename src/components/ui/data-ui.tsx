@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 /**
  * The shared furniture of the admin screens — header, summary tiles, toolbar
  * controls, table shell, empty state.
@@ -97,6 +101,71 @@ export function SummaryTile({
     >
       {body}
     </button>
+  );
+}
+
+/**
+ * One control for both export formats, so the page header does not grow a
+ * button per file type.
+ */
+export function ExportMenu({
+  onCsv,
+  onPdf,
+  busy,
+}: {
+  onCsv: () => void;
+  onPdf: () => void | Promise<void>;
+  busy?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div
+      className="relative"
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="inline-flex h-10 items-center gap-1.5 rounded-pill border border-plum/35 px-5 font-display text-sm font-semibold text-primary transition-colors hover:border-plum/60 hover:bg-plum/10 disabled:opacity-55"
+      >
+        {busy ? "Preparing…" : "Export"}
+        <span aria-hidden className="text-[10px]">▾</span>
+      </button>
+
+      {open && !busy && (
+        <div
+          role="menu"
+          className="absolute right-0 top-11 z-30 w-40 overflow-hidden rounded-card border border-line bg-paper p-1 shadow-lg"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onCsv();
+            }}
+            className="block w-full rounded-card px-3 py-2 text-left font-display text-sm text-ink hover:bg-line/60"
+          >
+            Spreadsheet (CSV)
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              void onPdf();
+            }}
+            className="block w-full rounded-card px-3 py-2 text-left font-display text-sm text-ink hover:bg-line/60"
+          >
+            Report (PDF)
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

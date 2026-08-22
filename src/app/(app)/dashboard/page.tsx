@@ -4,8 +4,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/demo-session-provider";
 import { Button } from "@/components/ui/button";
+import { ExportMenu } from "@/components/ui/data-ui";
+import {
+  downloadCsv,
+  downloadReportPdf,
+  generatedAt,
+} from "@/lib/pdf/export-report";
 import { TimeOffRequestModal } from "@/components/time-off/request-modal";
 import {
+  COMPANY_NAME,
   LEAVE_TYPES,
   employeeName,
   leaveBalance,
@@ -68,6 +75,7 @@ export default function DashboardPage() {
   const [busy, setBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const todayISO = today();
   const monthISO = todayISO.slice(0, 7);
@@ -132,6 +140,133 @@ export default function DashboardPage() {
     (r) => r.employeeId === currentEmployee.id && r.status === "pending",
   ).length;
 
+  const ATTENDANCE_HEADER = [
+    "Date",
+    "Status",
+    "Check in",
+    "Check out",
+    "Work hours",
+    "Extra hours",
+  ];
+
+  function attendanceRows() {
+    return [...records]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((r) => [
+        r.date,
+        r.status,
+        formatTime(r.checkIn),
+        formatTime(r.checkOut),
+        r.workHours ? r.workHours.toFixed(1) : "0.0",
+        r.extraHours ? r.extraHours.toFixed(1) : "0.0",
+      ]);
+  }
+
+  function exportCsv() {
+    downloadCsv(
+      ATTENDANCE_HEADER,
+      attendanceRows(),
+      `${currentEmployee.loginId}-attendance-${monthISO}`,
+    );
+  }
+
+  /** A month of your own record, in one page you can keep. */
+  async function exportPdf() {
+    setExporting(true);
+    try {
+      await downloadReportPdf(
+        {
+          title: "My Monthly Statement",
+          companyName: COMPANY_NAME,
+          meta: [
+            { label: "Employee", value: employeeName(currentEmployee) },
+            { label: "Login ID", value: currentEmployee.loginId },
+            {
+              label: "Role",
+              value: `${currentEmployee.jobTitle} · ${currentEmployee.department}`,
+            },
+            { label: "Manager", value: currentEmployee.manager },
+            { label: "Period", value: monthISO },
+            { label: "Generated", value: generatedAt() },
+          ],
+          summary: [
+            {
+              label: "Days present",
+              value: String(stats.present),
+              tone: "success",
+            },
+            { label: "Hours logged", value: stats.hours.toFixed(1) },
+            { label: "Extra hours", value: stats.extra.toFixed(1) },
+            { label: "Days on leave", value: String(stats.onLeave) },
+            {
+              label: "Absent",
+              value: String(stats.absent),
+              tone: stats.absent > 0 ? "warn" : "default",
+            },
+          ],
+          sections: [
+            {
+              title: "Leave balance",
+              columns: [
+                { header: "Leave type", width: 2 },
+                { header: "Allocated", width: 1, align: "right" as const },
+                { header: "Taken", width: 1, align: "right" as const },
+                { header: "Available", width: 1, align: "right" as const },
+              ],
+              rows: balances.map(({ type, allocated, taken, available }) => [
+                type.name,
+                String(allocated),
+                String(taken),
+                String(available),
+              ]),
+            },
+            {
+              title: "Attendance this month",
+              columns: [
+                { header: "Date", width: 1.2 },
+                { header: "Status", width: 1 },
+                { header: "Check in", width: 1, align: "right" as const },
+                { header: "Check out", width: 1, align: "right" as const },
+                { header: "Hours", width: 0.8, align: "right" as const },
+                { header: "Extra", width: 0.8, align: "right" as const },
+              ],
+              rows: attendanceRows(),
+              emptyLabel: "No attendance recorded this month yet.",
+            },
+            {
+              title: "My time off requests",
+              columns: [
+                { header: "Leave type", width: 1.2 },
+                { header: "Start", width: 1 },
+                { header: "End", width: 1 },
+                { header: "Days", width: 0.6, align: "right" as const },
+                { header: "Reason", width: 2.4 },
+                { header: "Status", width: 1 },
+              ],
+              rows: requests
+                .filter((r) => r.employeeId === currentEmployee.id)
+                .sort((a, b) => a.startDate.localeCompare(b.startDate))
+                .map((r) => [
+                  LEAVE_TYPES.find((t) => t.code === r.leaveType)?.name ??
+                    r.leaveType,
+                  r.startDate,
+                  r.endDate,
+                  String(r.dayCount),
+                  r.remarks || "—",
+                  r.status.charAt(0).toUpperCase() + r.status.slice(1),
+                ]),
+              emptyLabel: "You have not requested any time off.",
+            },
+          ],
+          footNote: `Personal record for ${employeeName(currentEmployee)} — generated from Dayflow.`,
+        },
+        `${currentEmployee.loginId}-statement-${monthISO}`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function toggleCheckIn() {
     setBusy(true);
     setActionError("");
@@ -190,7 +325,8 @@ export default function DashboardPage() {
             {currentEmployee.jobTitle} · reporting to {currentEmployee.manager}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <ExportMenu onCsv={exportCsv} onPdf={exportPdf} busy={exporting} />
           <Button variant="secondary" onClick={() => setModalOpen(true)}>
             Apply for leave
           </Button>
