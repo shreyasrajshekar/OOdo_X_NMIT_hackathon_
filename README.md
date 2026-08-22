@@ -2,9 +2,10 @@
 
 Dayflow is a role-based HRMS where attendance is the input to payroll, not just a log.
 
-This is the Phase 0 scaffold: repo, the 2B "Two Plums, Tinted" design tokens, the nav shell,
-and route stubs for every screen in the build guide. No backend yet — Supabase (schema, RLS,
-auth), the salary component engine, and realtime attendance come next.
+Phase 0 was the scaffold: repo, the 2B "Two Plums, Tinted" design tokens, the nav shell,
+and route stubs for every screen in the build guide. The database landed on top of that —
+schema, RLS, functions and storage all live in `supabase/`. Still to come: wiring the screens
+to it, the salary component engine, and realtime attendance.
 
 ## Stack
 
@@ -54,8 +55,14 @@ are the shared primitives every screen builds on — restyle here, not per-page.
 
 See `DAYFLOW_BUILD_GUIDE.md` and `2b-two-plums-design-system.md` for the full spec.
 
+## Database
+
+Schema, RLS and migrations are in `supabase/` — see `supabase/README.md` for how to point a
+local checkout at the project and what the policies actually do.
+
 ## Next steps (Phase 1)
 
-- Supabase project, schema + RLS from Section 5/7 of the build guide
-- Auth wiring, login ID generator, forced password change
-- `supabase gen types typescript`, committed
+- Auth wiring: sign-in by login ID, forced password change, session middleware
+- Employee create/edit against the real tables
+- Salary component engine + payslip generation
+- Realtime attendance on the status dots
