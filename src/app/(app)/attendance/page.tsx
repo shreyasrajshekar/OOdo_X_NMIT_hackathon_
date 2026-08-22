@@ -159,7 +159,7 @@ function AdminAttendance() {
           placeholder="Search employees"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-xs rounded-pill border border-line px-4 py-2 font-display text-sm text-ink outline-none focus:border-plum"
+          className="w-full max-w-xs rounded-pill border border-line px-4 py-2 font-display text-sm text-ink focus:border-plum"
         />
 
         <div className="flex items-center gap-2">
@@ -189,7 +189,7 @@ function AdminAttendance() {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-pill border border-line px-3 py-1.5 font-display text-sm text-ink outline-none focus:border-plum"
+            className="rounded-pill border border-line px-3 py-1.5 font-display text-sm text-ink focus:border-plum"
           />
           <button
             type="button"

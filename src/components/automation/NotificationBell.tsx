@@ -83,7 +83,7 @@ export default function NotificationBell() {
     <div className="relative">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-full hover:bg-line/60 transition-colors relative focus:outline-none"
+        className="p-2 rounded-full hover:bg-line/60 transition-colors relative"
         aria-label="Toggle notifications menu"
       >
         <Bell className="w-5 h-5 text-ink/75 hover:text-primary transition-colors" />

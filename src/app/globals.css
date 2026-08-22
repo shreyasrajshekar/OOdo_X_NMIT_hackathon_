@@ -17,29 +17,76 @@
   --radius-card: 12px; /* Smooth rounded corners instead of 4px */
 }
 
-/* Custom premium styling animations and decorations */
-@keyframes float {
-  0% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(2deg); }
-  100% { transform: translateY(0px) rotate(0deg); }
-}
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.03; transform: scale(1); }
-  50% { opacity: 0.06; transform: scale(1.1); }
-}
+/* --------------------------------------------------------------------------
+   Ground
+   The paper token is a tinted near-white, so it wants texture rather than a
+   flat fill. A fine grain plus one soft plum wash at the horizon reads as
+   stock; it holds up under the dense tables without competing with them.
+   -------------------------------------------------------------------------- */
 
 body {
   background-color: var(--color-paper);
   color: var(--color-ink);
   overflow-x: hidden;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(135, 90, 123, 0.04) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(92, 61, 84, 0.02) 0px, transparent 50%);
+  background-image:
+    radial-gradient(120% 80% at 50% -20%, rgba(135, 90, 123, 0.07) 0%, transparent 60%),
+    radial-gradient(90% 60% at 100% 100%, rgba(92, 61, 84, 0.04) 0%, transparent 65%);
   background-attachment: fixed;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Selection and Scrollbar */
+/* Grain sits above the wash and below everything else. */
+.paper-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+}
+
+/* --------------------------------------------------------------------------
+   Focus
+   Inputs previously set `outline-none` with only a border-colour change, which
+   is invisible against the tint at 1px and left keyboard users with nothing to
+   follow. One ring, used everywhere, drawn outside the box so it never shifts
+   layout.
+   -------------------------------------------------------------------------- */
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-plum);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Pointer clicks shouldn't paint the ring, only keyboard travel. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   Numerals
+   The design system asks for tabular figures in anything vertically scannable.
+   Tables, the mono meta face and the numeric utility all opt in.
+   -------------------------------------------------------------------------- */
+
+table,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.font-mono,
+[class*="font-mono"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "ss01";
+}
+
+/* --------------------------------------------------------------------------
+   Selection and scrollbar
+   -------------------------------------------------------------------------- */
+
 ::selection {
   background-color: rgba(135, 90, 123, 0.2);
   color: var(--color-primary);
@@ -63,34 +110,44 @@ body {
   background: var(--color-plum);
 }
 
-/* Premium UI elements styling */
+* {
+  scrollbar-color: var(--color-line) var(--color-paper);
+}
+
+/* --------------------------------------------------------------------------
+   Surfaces
+   -------------------------------------------------------------------------- */
+
 .premium-card {
   backdrop-filter: blur(12px);
   background-color: rgba(251, 249, 251, 0.85);
   border: 1px solid rgba(237, 229, 235, 0.7);
-  box-shadow: 0 10px 30px -10px rgba(92, 61, 84, 0.03);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 1px 2px rgba(92, 61, 84, 0.04),
+    0 10px 30px -12px rgba(92, 61, 84, 0.06);
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .premium-card:hover {
   transform: translateY(-2px);
   border-color: rgba(135, 90, 123, 0.3);
-  box-shadow: 0 20px 40px -15px rgba(92, 61, 84, 0.07);
-}
-
-.text-gradient {
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  background-image: linear-gradient(135deg, var(--color-primary) 0%, var(--color-plum) 100%);
+  box-shadow:
+    0 1px 2px rgba(92, 61, 84, 0.05),
+    0 20px 40px -16px rgba(92, 61, 84, 0.1);
 }
 
 .glow-button {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.2s ease;
 }
 
 .glow-button:hover {
-  box-shadow: 0 0 20px rgba(92, 61, 84, 0.25);
+  box-shadow: 0 6px 20px -6px rgba(92, 61, 84, 0.35);
   transform: translateY(-1px);
 }
 
@@ -104,39 +161,46 @@ thead tr {
   background-color: rgba(237, 229, 235, 0.5) !important;
 }
 
-/* Blurry floating visual blobs */
-.blob-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  z-index: -10;
-  overflow: hidden;
+/* --------------------------------------------------------------------------
+   Entrance
+   One staggered reveal on load rather than motion scattered through the page.
+   Anything that opts in sets --enter-delay.
+   -------------------------------------------------------------------------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-.blob-1 {
-  position: absolute;
-  top: -10%;
-  right: 10%;
-  width: 50vw;
-  height: 50vw;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--color-plum) 0%, transparent 70%);
-  filter: blur(80px);
-  animation: pulse-slow 15s infinite ease-in-out;
+.enter {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--enter-delay, 0ms);
 }
 
-.blob-2 {
-  position: absolute;
-  bottom: -10%;
-  left: 5%;
-  width: 60vw;
-  height: 60vw;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--color-primary) 0%, transparent 70%);
-  filter: blur(100px);
-  animation: pulse-slow 20s infinite ease-in-out;
-}
+/* --------------------------------------------------------------------------
+   Reduced motion
+   Everything above is decorative. If the reader has asked for stillness, the
+   layout must land in its final state immediately rather than merely faster.
+   -------------------------------------------------------------------------- */
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .premium-card:hover,
+  .glow-button:hover {
+    transform: none;
+  }
+}
