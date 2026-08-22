@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/demo-session-provider";
+import { AdminGuard } from "@/components/admin-guard";
 import { Button } from "@/components/ui/button";
 import { Tabs } from "@/components/ui/tabs";
 import { AllocationPanel } from "@/components/time-off/allocation-panel";
@@ -327,7 +328,7 @@ function EmployeeTimeOff() {
   );
 }
 
-export default function TimeOffPage() {
+function TimeOffPageInner() {
   const { role } = useSession();
 
   return (
@@ -345,5 +346,14 @@ export default function TimeOffPage() {
 
       {role === "admin" ? <AdminTimeOff /> : <EmployeeTimeOff />}
     </div>
+  );
+}
+
+/** Admin/HR only — employees are redirected to their own workspace. */
+export default function TimeOffPage() {
+  return (
+    <AdminGuard>
+      <TimeOffPageInner />
+    </AdminGuard>
   );
 }

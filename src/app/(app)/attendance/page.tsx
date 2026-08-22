@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/demo-session-provider";
+import { AdminGuard } from "@/components/admin-guard";
 import { supabase } from "@/lib/supabase";
 import { fetchAttendanceRecords, fetchEmployees } from "@/lib/supabase-db";
 import {
@@ -455,7 +456,7 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 }
 
 
-export default function AttendancePage() {
+function AttendancePageInner() {
   const { role } = useSession();
 
   return (
@@ -473,5 +474,14 @@ export default function AttendancePage() {
 
       {role === "admin" ? <AdminAttendance /> : <EmployeeAttendance />}
     </div>
+  );
+}
+
+/** Admin/HR only — employees are redirected to their own workspace. */
+export default function AttendancePage() {
+  return (
+    <AdminGuard>
+      <AttendancePageInner />
+    </AdminGuard>
   );
 }
