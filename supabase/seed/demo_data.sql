@@ -77,16 +77,24 @@ BEGIN
         v_email := lower(regexp_replace(r.first || '.' || r.last, '[^A-Za-z.]', '', 'g'))
                    || '.' || r.idx || '@' || v_domain;
 
+        -- The token columns must be '' and not NULL. GoTrue scans them into
+        -- Go strings, so a NULL makes every sign-in fail with
+        -- "Database error querying schema" - the rows look perfectly fine in
+        -- the table, which is what makes it such a nasty one to chase.
         INSERT INTO auth.users (
             instance_id, id, aud, role, email, encrypted_password,
             email_confirmed_at, created_at, updated_at,
-            raw_app_meta_data, raw_user_meta_data
+            raw_app_meta_data, raw_user_meta_data,
+            confirmation_token, recovery_token, email_change,
+            email_change_token_new, email_change_token_current,
+            phone_change, phone_change_token, reauthentication_token
         ) VALUES (
             '00000000-0000-0000-0000-000000000000', v_uid, 'authenticated',
             'authenticated', v_email, crypt(v_password, gen_salt('bf')),
             now(), now(), now(),
             '{"provider":"email","providers":["email"]}'::jsonb,
-            jsonb_build_object('first_name', r.first, 'last_name', r.last)
+            jsonb_build_object('first_name', r.first, 'last_name', r.last),
+            '', '', '', '', '', '', '', ''
         );
 
         INSERT INTO auth.identities (

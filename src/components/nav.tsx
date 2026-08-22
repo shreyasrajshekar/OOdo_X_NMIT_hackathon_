@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DayflowMark } from "@/components/ui/dayflow-mark";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/demo-session-provider";
@@ -98,8 +99,9 @@ export function Nav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link
           href="/employees"
-          className="font-display text-lg font-extrabold tracking-tight text-primary transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-2 font-display text-lg font-extrabold tracking-tight text-primary transition-opacity hover:opacity-90"
         >
+          <DayflowMark size={28} priority />
           Dayflow
         </Link>
 

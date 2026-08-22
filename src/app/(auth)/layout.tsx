@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DayflowMark } from "@/components/ui/dayflow-mark";
 
 /**
  * Auth screens get a real front door: the product argument on the left, the
@@ -28,9 +29,7 @@ export default function AuthLayout({
             href="/"
             className="inline-flex items-center gap-2.5 font-display text-[19px] font-extrabold tracking-[-0.02em] text-paper"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-card bg-paper font-display text-base font-extrabold text-primary">
-              D
-            </span>
+            <DayflowMark size={32} plated priority />
             Dayflow
           </Link>
         </div>

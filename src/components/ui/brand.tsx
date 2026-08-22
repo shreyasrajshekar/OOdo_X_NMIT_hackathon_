@@ -1,3 +1,5 @@
+import { DayflowMark } from "@/components/ui/dayflow-mark";
+
 /**
  * The "App/Web Logo" block that sits at the top of every auth card.
  * Renders the company logo when one has been uploaded, otherwise the
@@ -21,9 +23,7 @@ export function AuthBrand({
         />
       ) : (
         <>
-          <span className="flex h-8 w-8 items-center justify-center rounded-card bg-primary font-display text-base font-extrabold text-paper">
-            D
-          </span>
+          <DayflowMark size={32} priority />
           <span className="font-display text-[19px] font-extrabold tracking-[-0.02em] text-primary">
             Dayflow
           </span>
