@@ -308,11 +308,20 @@ function buildEmployees(): Employee[] {
       serial,
     });
     loginIdsSoFar.push(loginId);
-    employees.push({ id: loginId.toLowerCase(), loginId, ...seed });
+    
+    let id = loginId.toLowerCase();
+    if (seed.firstName === "Aditi" && seed.lastName === "Rao") {
+      id = "aaaaaaaa-bbbb-cccc-dddd-eeee00000002";
+    } else if (seed.firstName === "Priya" && seed.lastName === "Sharma") {
+      id = "aaaaaaaa-bbbb-cccc-dddd-eeee00000001";
+    }
+    
+    employees.push({ id, loginId, ...seed });
   }
 
   return employees;
 }
+
 
 export const EMPLOYEES: Employee[] = buildEmployees();
 

@@ -212,23 +212,24 @@ function EmployeeTimeOff() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-card border border-line p-6">
-            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-plum">
+          <div className="rounded-card p-6 premium-card shadow-sm">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-plum/90">
               Paid available
             </p>
-            <p className="mt-2 font-display text-[30px] font-extrabold tabular-nums text-ink">
+            <p className="mt-3 font-display text-[32px] font-extrabold tabular-nums text-ink">
               {paidBalance.available}
             </p>
           </div>
-          <div className="rounded-card border border-line p-6">
-            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-plum">
+          <div className="rounded-card p-6 premium-card shadow-sm">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-plum/90">
               Sick available
             </p>
-            <p className="mt-2 font-display text-[30px] font-extrabold tabular-nums text-ink">
+            <p className="mt-3 font-display text-[32px] font-extrabold tabular-nums text-ink">
               {sickBalance.available}
             </p>
           </div>
         </div>
+
         <Button onClick={() => setModalOpen(true)}>New request</Button>
       </div>
 

@@ -35,9 +35,14 @@ export default function RootLayout({
       lang="en"
       className={`${manrope.variable} ${sourceSerif.variable} ${plexMono.variable}`}
     >
-      <body className="min-h-screen font-display antialiased">
+      <body className="min-h-screen font-display antialiased relative">
+        <div className="blob-container" aria-hidden="true">
+          <div className="blob-1"></div>
+          <div className="blob-2"></div>
+        </div>
         {children}
       </body>
+
     </html>
   );
 }

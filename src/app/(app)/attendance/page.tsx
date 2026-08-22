@@ -103,19 +103,42 @@ function AdminAttendance() {
   useEffect(() => {
     const fetchAdminLogs = async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("attendance")
           .select("*")
-          .eq("work_date", selectedDate);
+          .eq("date", selectedDate);
+
+        if (error) throw error;
+
         if (data) {
-          setDbRecords(data as DbAttendanceRow[]);
+          const mapped = (data as Array<{
+            id: number;
+            employee_id: string;
+            date: string;
+            check_in: string | null;
+            check_out: string | null;
+            hours_worked: number | string | null;
+            status: AttendanceStatus;
+          }>).map((r) => ({
+            id: String(r.id),
+            employee_id: r.employee_id,
+            work_date: r.date,
+            check_in: r.check_in,
+            check_out: r.check_out,
+            work_hours: Number(r.hours_worked) || 0,
+            extra_hours: Number(r.hours_worked) > 8 ? (Number(r.hours_worked) - 8) : 0,
+            status: r.status,
+          }));
+          setDbRecords(mapped);
         }
+
       } catch (err) {
         console.warn("Failed to fetch admin attendance logs:", err);
       }
     };
     fetchAdminLogs();
   }, [selectedDate]);
+
 
 
   const employees = useMemo(
@@ -420,16 +443,17 @@ function EmployeeAttendance() {
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-card border border-line p-6">
-      <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-plum">
+    <div className="rounded-card p-6 premium-card shadow-sm">
+      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-plum/90">
         {label}
       </p>
-      <p className="mt-2 font-display text-[30px] font-extrabold tabular-nums text-ink">
+      <p className="mt-3 font-display text-[32px] font-extrabold tabular-nums text-ink">
         {value}
       </p>
     </div>
   );
 }
+
 
 export default function AttendancePage() {
   const { role } = useSession();

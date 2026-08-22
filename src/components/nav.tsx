@@ -12,6 +12,7 @@ import {
   checkOutEmployee,
   fetchAttendanceRecords,
 } from "@/lib/supabase-db";
+import NotificationBell from "@/components/automation/NotificationBell";
 
 const LINKS = [
   { href: "/employees", label: "Employees" },
@@ -58,28 +59,30 @@ export function Nav() {
 
   async function toggleCheckIn() {
     const workDate = new Date().toISOString().split("T")[0];
-    if (checkedIn) {
-      const checkInTime = since ? since.getTime() : Date.now();
-      const elapsedHours = (Date.now() - checkInTime) / 3600000;
-      const breakHours = 1;
-      const workHours = Math.max(0, elapsedHours - breakHours);
-      const extraHours = Math.max(0, workHours - 8);
+    const now = new Date();
 
-      const success = await checkOutEmployee(
-        currentEmployee.id,
-        workDate,
-        workHours,
-        extraHours,
-      );
-      if (success) {
+    if (checkedIn) {
+      const records = await fetchAttendanceRecords(currentEmployee.id, workDate.slice(0, 7));
+      const todayRecord = records.find((r) => r.date === workDate);
+      
+      let workHours = 8;
+      if (todayRecord && todayRecord.checkIn) {
+        const diffMs = now.getTime() - new Date(todayRecord.checkIn).getTime();
+        workHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
+      }
+      
+      const ok = await checkOutEmployee(currentEmployee.id, workDate, workHours, 0);
+      if (ok) {
         setCheckedIn(false);
         setSince(null);
+        router.refresh();
       }
     } else {
-      const success = await checkInEmployee(currentEmployee.id, workDate);
-      if (success) {
+      const ok = await checkInEmployee(currentEmployee.id, workDate);
+      if (ok) {
         setCheckedIn(true);
-        setSince(new Date());
+        setSince(now);
+        router.refresh();
       }
     }
   }
@@ -91,11 +94,11 @@ export function Nav() {
   }
 
   return (
-    <header className="border-b border-line">
+    <header className="sticky top-0 z-50 border-b border-line/60 backdrop-blur-md bg-paper/85 shadow-sm">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link
           href="/employees"
-          className="font-display text-lg font-extrabold tracking-tight text-primary"
+          className="font-display text-lg font-extrabold tracking-tight text-primary transition-opacity hover:opacity-90"
         >
           Dayflow
         </Link>
@@ -107,8 +110,8 @@ export function Nav() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`font-display text-sm font-semibold hover:text-primary ${
-                  active ? "text-primary" : "text-ink"
+                className={`font-display text-sm font-semibold hover:text-primary transition-colors ${
+                  active ? "text-primary font-bold" : "text-ink/80"
                 }`}
               >
                 {link.label}
@@ -117,12 +120,12 @@ export function Nav() {
           })}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {canAddUsers && (
             <button
               type="button"
               onClick={openAddUser}
-              className="flex h-9 items-center gap-1.5 rounded-pill bg-primary px-4 font-display text-sm font-semibold text-paper transition-colors hover:bg-primary/90"
+              className="flex h-9 items-center gap-1.5 rounded-pill bg-primary px-4 font-display text-sm font-semibold text-paper hover:bg-primary/95 transition-all shadow-sm hover:shadow-md glow-button"
             >
               <span aria-hidden className="text-base leading-none">
                 +
@@ -134,18 +137,24 @@ export function Nav() {
           <button
             type="button"
             onClick={toggleCheckIn}
-            className="flex items-center gap-2 rounded-pill border border-line px-3 py-1.5"
+            className={`flex items-center gap-2 rounded-pill border px-3 py-1.5 transition-all shadow-sm hover:shadow-md ${
+              checkedIn 
+                ? "border-success/30 bg-success/5 hover:bg-success/10" 
+                : "border-line bg-paper hover:bg-line/20"
+            }`}
           >
             <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                checkedIn ? "bg-success" : "bg-warn"
+              className={`h-2 w-2 rounded-full ${
+                checkedIn ? "bg-success animate-pulse" : "bg-warn"
               }`}
               aria-hidden
             />
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-ink/90">
               {checkedIn && since ? `Since ${formatTime(since)}` : "Check in"}
             </span>
           </button>
+
+          <NotificationBell />
 
           <div className="relative">
             <button

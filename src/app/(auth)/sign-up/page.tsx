@@ -8,7 +8,8 @@ import { AuthField } from "@/components/ui/auth-field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { companyInitials, generateLoginId } from "@/lib/login-id";
+// Removed unused company lookup import
+
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -90,61 +91,47 @@ export default function SignUpPage() {
         }
       }
 
-      // 3. Create the company. The stored code is the same 2-letter company
-      //    prefix every Login ID is built from (Odoo India -> OI).
-      const code = companyInitials(companyName);
-      const { data: companyData } = await supabase
-        .from("companies")
-        .insert({
-          name: companyName.trim(),
-          code,
-          logo_url: logoUrl || null,
-        })
-        .select()
-        .single();
-
-      const companyId = companyData?.id || crypto.randomUUID();
-
-      // 4. Build the admin's Login ID: [CO][FIRST2][LAST2][YEAR][SERIAL]
+      // 3. Resolve Admin Name
       const nameParts = name.trim().split(/\s+/).filter(Boolean);
       const firstName = nameParts[0] || "Admin";
       const lastName = nameParts.slice(1).join(" ") || "User";
-      const joiningYear = new Date().getFullYear();
 
-      const loginId = generateLoginId({
-        companyName,
-        firstName,
-        lastName,
-        joiningYear,
-        serial: 1,
-      });
-
-      // 5. Create the admin employee row.
-      const { error: empError } = await supabase.from("employees").insert({
+      // 4. Create the admin profile row
+      const { error: profileError } = await supabase.from("profiles").insert({
         id: userId,
-        company_id: companyId,
-        login_id: loginId,
         first_name: firstName,
         last_name: lastName,
-        work_email: email.trim(),
         phone: phone.trim() || null,
         role: "admin",
-        joining_date: new Date().toISOString().split("T")[0],
-        // The admin chose this password themselves, so no forced reset.
-        must_change_password: false,
+        join_date: new Date().toISOString().split("T")[0],
+        is_active: true,
+        avatar_url: logoUrl || null,
       });
 
-      if (empError) {
-        console.error("Employee row insertion error:", empError.message);
-      }
+      if (profileError) throw profileError;
 
-      // 6. Seed an empty resume record.
-      await supabase.from("employee_resume").insert({
+
+      // 5. Create default salary structure row
+      await supabase.from("salary_structure").insert({
         employee_id: userId,
-        about: `HR Admin at ${companyName.trim()}.`,
-        skills: [],
-        certifications: [],
+        basic: 100000.00,
+        hra: 40000.00,
+        da: 20000.00,
+        allowance: 20000.00,
+        pf_rate: 12.00,
+        tax_rate: 10.00
       });
+
+      // 6. Create default leave balance row
+      await supabase.from("leave_balance").insert({
+        employee_id: userId,
+        year: new Date().getFullYear(),
+        paid_leave: 12,
+        sick_leave: 10,
+        casual_leave: 6,
+        unpaid_leave: 0
+      });
+
 
       router.push("/employees");
     } catch (err) {

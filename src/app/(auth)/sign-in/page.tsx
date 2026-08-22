@@ -8,6 +8,8 @@ import { AuthField } from "@/components/ui/auth-field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { EMPLOYEES } from "@/lib/mock-data";
+
 
 export default function SignInPage() {
   const router = useRouter();
@@ -24,26 +26,15 @@ export default function SignInPage() {
     try {
       let emailInput = identifier.trim();
 
-      // A Login ID (e.g. OIJODO20220001) has no "@" — resolve it to the
-      // employee's work email before handing it to Supabase Auth.
+      // Resolve Login ID (e.g. OIJODO20220001) to email locally via EMPLOYEES mapping
       if (!emailInput.includes("@")) {
-        const { data, error } = await supabase
-          .from("employees")
-          .select("work_email")
-          .eq("login_id", emailInput.toUpperCase())
-          .maybeSingle();
-
-        if (error) {
-          console.warn("Error looking up login ID:", error.message);
-        }
-
-        if (!data?.work_email) {
+        const matched = EMPLOYEES.find((e) => e.loginId.toUpperCase() === emailInput.toUpperCase());
+        if (!matched) {
           setErrorMsg("No account found for that Login ID.");
           setLoading(false);
           return;
         }
-
-        emailInput = data.work_email;
+        emailInput = matched.workEmail;
       }
 
       const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -57,20 +48,11 @@ export default function SignInPage() {
         return;
       }
 
-      // Employees created by HR/Admin start on a system-generated password
-      // and must replace it before they reach the app.
-      const userId = authData.user?.id;
-      if (userId) {
-        const { data: employee } = await supabase
-          .from("employees")
-          .select("must_change_password")
-          .eq("id", userId)
-          .maybeSingle();
-
-        if (employee?.must_change_password) {
-          router.push("/change-password");
-          return;
-        }
+      // Check must_change_password flag directly in the user metadata
+      const mustChange = authData.user?.user_metadata?.must_change_password;
+      if (mustChange) {
+        router.push("/change-password");
+        return;
       }
 
       router.push("/employees");
@@ -81,6 +63,7 @@ export default function SignInPage() {
       setLoading(false);
     }
   }
+
 
   return (
     <div className="flex flex-col gap-6">

@@ -31,9 +31,12 @@ export default function ChangePasswordPage() {
     setLoading(true);
 
     try {
-      // 1. Replace the system-generated password.
-      const { data: authData, error: authError } =
-        await supabase.auth.updateUser({ password });
+      // 1. Replace the system-generated password and clear the forced-reset metadata flag.
+      const { error: authError } =
+        await supabase.auth.updateUser({ 
+          password,
+          data: { must_change_password: false }
+        });
 
       if (authError) {
         setErrorMsg(authError.message);
@@ -41,14 +44,6 @@ export default function ChangePasswordPage() {
         return;
       }
 
-      const userId = authData.user?.id;
-      if (userId) {
-        // 2. Clear the forced-reset flag.
-        await supabase
-          .from("employees")
-          .update({ must_change_password: false })
-          .eq("id", userId);
-      }
 
       router.push("/employees");
     } catch (err) {

@@ -52,18 +52,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Employees added by HR sign in on a system-generated password and must
-    // replace it before they can reach anything else.
-    const { data: authRow } = await supabase
-      .from("employees")
-      .select("must_change_password")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (authRow?.must_change_password) {
+    const mustChange = user.user_metadata?.must_change_password;
+    if (mustChange) {
       router.replace("/change-password");
       return;
     }
+
 
     try {
       const employee = await fetchEmployeeById(user.id);
