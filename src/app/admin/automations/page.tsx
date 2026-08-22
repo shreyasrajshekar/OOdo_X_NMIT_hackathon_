@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Activity, Filter, Clock } from 'lucide-react'
+import { Activity } from 'lucide-react'
 
 interface AutomationLog {
   id: number
