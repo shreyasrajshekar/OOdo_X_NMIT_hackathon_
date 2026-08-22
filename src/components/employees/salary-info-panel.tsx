@@ -7,7 +7,7 @@ import {
   resolveComponents,
 } from "@/lib/salary";
 import type { Employee } from "@/lib/mock-data";
-import { supabase } from "@/lib/supabase";
+import { updateSalaryWageInDb } from "@/lib/supabase-db";
 
 const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -35,25 +35,8 @@ export function SalaryInfoPanel({
     setSaving(true);
     setSaved(false);
     try {
-      const { error } = await supabase
-        .from("salary_structures")
-        .update({ monthly_wage: wage })
-        .eq("employee_id", employee.id)
-        .eq("is_current", true);
-
-      if (error) {
-        // If update failed (e.g. no current structure exists), insert a new one
-        const { error: insertError } = await supabase
-          .from("salary_structures")
-          .insert({
-            employee_id: employee.id,
-            monthly_wage: wage,
-            working_days_month: employee.workingDaysPerWeek === 6 ? 26 : 22,
-            break_hours: employee.breakHours,
-            is_current: true,
-          });
-        if (insertError) throw insertError;
-      }
+      const success = await updateSalaryWageInDb(employee.id, wage);
+      if (!success) throw new Error("Database update returned failure");
 
       employee.monthlyWage = wage; // Update in-memory reference
       setSaved(true);
@@ -63,6 +46,7 @@ export function SalaryInfoPanel({
       setSaving(false);
     }
   }
+
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

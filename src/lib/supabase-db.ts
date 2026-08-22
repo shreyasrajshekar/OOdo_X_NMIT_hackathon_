@@ -1,5 +1,18 @@
 import { supabase } from "./supabase";
-import { COMPANY_NAME, EMPLOYEES, LEAVE_ALLOCATIONS, LEAVE_REQUESTS, type Employee, type LeaveRequest, type LeaveAllocation, type AttendanceRecord, type AttendanceStatus, type RequestStatus, type Department, type LeaveTypeCode } from "./mock-data";
+import { 
+  COMPANY_NAME, 
+  EMPLOYEES, 
+  LEAVE_ALLOCATIONS, 
+  LEAVE_REQUESTS, 
+  type Employee, 
+  type LeaveRequest, 
+  type LeaveAllocation, 
+  type AttendanceRecord, 
+  type AttendanceStatus, 
+  type RequestStatus, 
+  type Department, 
+  type LeaveTypeCode 
+} from "./mock-data";
 
 // Helper to determine if a database error is a missing table (PGRST205)
 function isMissingTableError(error: { code?: string; message?: string } | null | undefined): boolean {
@@ -7,187 +20,139 @@ function isMissingTableError(error: { code?: string; message?: string } | null |
 }
 
 // --- DB Interfaces for strict typing ---
-interface DbResume {
-  about?: string | null;
-  love_about_job?: string | null;
-  interests?: string | null;
-  skills?: string[] | null;
-  certifications?: string[] | null;
-}
-
-interface DbSalaryStructure {
-  monthly_wage: number;
-  working_days_month: number;
-  break_hours: number;
-  is_current: boolean;
-}
-
-interface DbEmployee {
+interface DbProfile {
   id: string;
-  login_id: string;
   first_name: string;
   last_name: string;
-  work_email: string;
-  personal_email?: string | null;
-  phone?: string | null;
+  phone: string | null;
   role: "admin" | "employee";
-  department?: string | null;
-  job_title?: string | null;
-  manager_id?: string | null;
-  location?: string | null;
-  joining_date: string;
-  dob?: string | null;
-  gender?: string | null;
-  marital_status?: string | null;
-  nationality?: string | null;
-  address?: string | null;
-  bank_account_no?: string | null;
-  bank_name?: string | null;
-  ifsc_code?: string | null;
-  pan_no?: string | null;
-  uan_no?: string | null;
-  employee_resume?: DbResume[] | DbResume | null;
-  salary_structures?: DbSalaryStructure[] | null;
+  department: string | null;
+  position: string | null;
+  join_date: string | null;
+  avatar_url: string | null;
+  is_active: boolean | null;
+  created_at: string | null;
+  salary_structure?: {
+    basic: number;
+    hra: number;
+    da: number;
+    allowance: number;
+    pf_rate: number | null;
+    tax_rate: number | null;
+  } | null;
 }
 
 interface DbAttendance {
-  id: string;
+  id: number;
   employee_id: string;
-  work_date: string;
+  date: string;
   check_in: string | null;
   check_out: string | null;
-  work_hours: number | string | null;
-  extra_hours: number | string | null;
+  hours_worked: number | string | null;
   status: AttendanceStatus;
 }
 
 interface DbLeaveRequest {
-  id: string;
+  id: number;
   employee_id: string;
-  leave_type_id: string;
-  start_date: string;
-  end_date: string;
-  day_count: number | string;
-  remarks?: string | null;
+  leave_type: string;
+  from_date: string;
+  to_date: string;
+  total_days: number;
+  reason: string;
   status: RequestStatus;
-  leave_types?: {
-    code: string;
-    name: string;
-  } | null;
 }
 
-interface DbLeaveAllocation {
-  id: string;
+interface DbLeaveBalance {
+  id: number;
   employee_id: string;
-  leave_type_id: string;
-  days: number | string;
-  valid_from: string;
-  valid_to: string;
-  note?: string | null;
-  leave_types?: {
-    code: string;
-    name: string;
-  } | null;
+  year: number;
+  paid_leave: number | null;
+  sick_leave: number | null;
+  casual_leave: number | null;
+  unpaid_leave: number | null;
 }
 
-// --- Company Scoping Helper ---
-// For the hackathon, we assume a default company is either fetched or created.
-let defaultCompanyId: string | null = null;
-async function getDefaultCompanyId(): Promise<string> {
-  if (defaultCompanyId) return defaultCompanyId;
+// --- Company Scoping Helper (Mock tenant logic for single-tenant schema) ---
 
-  try {
-    const { data: companies, error } = await supabase.from("companies").select("id").limit(1);
-    if (error && !isMissingTableError(error)) {
-      console.error("Error fetching companies:", error);
-    }
-    if (companies && companies.length > 0) {
-      defaultCompanyId = companies[0].id;
-      return defaultCompanyId!;
-    }
-
-    // Try creating a default company if none exists and table is available
-    const { data: newCompany } = await supabase
-      .from("companies")
-      .insert({ name: "Odoo India", code: "OD" })
-      .select("id")
-      .single();
-
-    if (newCompany) {
-      defaultCompanyId = (newCompany as { id: string }).id;
-      return defaultCompanyId!;
-    }
-  } catch (e) {
-    console.warn("Fallback to static company id:", e);
-  }
-
-  // Temporary fallback UUID for company
-  return "00000000-0000-0000-0000-000000000000";
+export async function fetchCompanyName(): Promise<string> {
+  return COMPANY_NAME;
 }
 
 // --- Employees Queries & Mutations ---
 
 export async function fetchEmployees(): Promise<Employee[]> {
   try {
-    const { data: dbEmps, error } = await supabase
-      .from("employees")
+    const { data: dbProfiles, error } = await supabase
+      .from("profiles")
       .select(`
         *,
-        employee_resume (about, love_about_job, interests, skills, certifications),
-        salary_structures (monthly_wage, working_days_month, break_hours)
+        salary_structure (basic, hra, da, allowance, pf_rate, tax_rate)
       `)
       .eq("is_active", true);
 
     if (error) {
       if (isMissingTableError(error)) {
-        console.warn("Table 'employees' not found in Supabase. Falling back to mock data.");
+        console.warn("Table 'profiles' not found in Supabase. Falling back to mock data.");
         return EMPLOYEES;
       }
       throw error;
     }
 
-    if (!dbEmps || dbEmps.length === 0) {
-      return EMPLOYEES; // Fallback if database is empty
+    if (!dbProfiles || dbProfiles.length === 0) {
+      return EMPLOYEES;
     }
 
-    const castedEmps = dbEmps as unknown as DbEmployee[];
+    const castedProfiles = dbProfiles as unknown as DbProfile[];
 
-    return castedEmps.map((emp) => {
-      const resume = Array.isArray(emp.employee_resume) ? emp.employee_resume[0] : emp.employee_resume;
-      const currentSal = emp.salary_structures?.find((s) => s.is_current) || emp.salary_structures?.[0];
+    return castedProfiles.map((prof) => {
+      // Find matching mock employee to enrich profiles with descriptions/UAN
+      const mockEmp = EMPLOYEES.find(
+        (e) =>
+          e.id.toLowerCase() === prof.id.toLowerCase() ||
+          (prof.id === "aaaaaaaa-bbbb-cccc-dddd-eeee00000001" && e.id === "emp-2") || // Priya Sharma
+          (prof.id === "aaaaaaaa-bbbb-cccc-dddd-eeee00000002" && e.id === "emp-1")    // Aditi Rao
+      );
+
+      const sal = prof.salary_structure;
+      const monthlyWage = sal 
+        ? (Number(sal.basic) + Number(sal.hra) + Number(sal.da) + Number(sal.allowance)) 
+        : (mockEmp?.monthlyWage || 50000);
       
+      const loginId = mockEmp?.loginId || (prof.first_name.substring(0,2) + prof.last_name.substring(0,2) + "2026").toUpperCase();
+
       return {
-        id: emp.id,
-        loginId: emp.login_id,
-        firstName: emp.first_name,
-        lastName: emp.last_name,
-        workEmail: emp.work_email,
-        personalEmail: emp.personal_email || "",
-        mobile: emp.phone || "",
-        role: emp.role,
-        department: (emp.department as Department) || "Engineering", // Allow Department casting
-        jobTitle: emp.job_title || "",
-        manager: emp.manager_id || "—",
-        location: emp.location || "",
-        joiningDate: emp.joining_date,
-        dob: emp.dob || "",
-        gender: emp.gender || "",
-        maritalStatus: emp.marital_status || "",
-        nationality: emp.nationality || "",
-        address: emp.address || "",
-        bankAccountNo: emp.bank_account_no || "",
-        bankName: emp.bank_name || "",
-        ifsc: emp.ifsc_code || "",
-        pan: emp.pan_no || "",
-        uan: emp.uan_no || "",
-        monthlyWage: currentSal?.monthly_wage || 50000,
-        workingDaysPerWeek: currentSal?.working_days_month === 26 ? 6 : 5,
-        breakHours: currentSal?.break_hours || 1,
-        about: resume?.about || "",
-        loveAboutJob: resume?.love_about_job || "",
-        interests: resume?.interests || "",
-        skills: Array.isArray(resume?.skills) ? resume.skills : [],
-        certifications: Array.isArray(resume?.certifications) ? resume.certifications : [],
+        id: prof.id,
+        loginId,
+        firstName: prof.first_name,
+        lastName: prof.last_name,
+        workEmail: mockEmp?.workEmail || `${prof.first_name.toLowerCase()}.${prof.last_name.toLowerCase()}@odoo.in`,
+        personalEmail: mockEmp?.personalEmail || "",
+        mobile: prof.phone || mockEmp?.mobile || "",
+        role: prof.role,
+        department: (prof.department as Department) || mockEmp?.department || "Engineering",
+        jobTitle: prof.position || mockEmp?.jobTitle || "",
+        manager: mockEmp?.manager || "—",
+        location: mockEmp?.location || "Bengaluru",
+        joiningDate: prof.join_date || mockEmp?.joiningDate || new Date().toISOString().split("T")[0],
+        dob: mockEmp?.dob || "",
+        gender: mockEmp?.gender || "",
+        maritalStatus: mockEmp?.maritalStatus || "",
+        nationality: mockEmp?.nationality || "",
+        address: mockEmp?.address || "",
+        bankAccountNo: mockEmp?.bankAccountNo || "",
+        bankName: mockEmp?.bankName || "",
+        ifsc: mockEmp?.ifsc || "",
+        pan: mockEmp?.pan || "",
+        uan: mockEmp?.uan || "",
+        monthlyWage,
+        workingDaysPerWeek: mockEmp?.workingDaysPerWeek || 5,
+        breakHours: mockEmp?.breakHours || 1,
+        about: mockEmp?.about || "",
+        loveAboutJob: mockEmp?.loveAboutJob || "",
+        interests: mockEmp?.interests || "",
+        skills: mockEmp?.skills || [],
+        certifications: mockEmp?.certifications || [],
       };
     });
   } catch (e) {
@@ -196,96 +161,65 @@ export async function fetchEmployees(): Promise<Employee[]> {
   }
 }
 
-/** Name of the tenant company, used for Login IDs and outbound email. */
-export async function fetchCompanyName(): Promise<string> {
-  try {
-    const { data } = await supabase
-      .from("companies")
-      .select("name")
-      .limit(1)
-      .maybeSingle();
-    const name = (data as { name?: string } | null)?.name;
-    if (name) return name;
-  } catch (e) {
-    console.warn("Could not read the company name:", e);
-  }
-  return COMPANY_NAME;
-}
-
 export async function fetchEmployeeById(id: string): Promise<Employee | undefined> {
   const employees = await fetchEmployees();
   return employees.find((e) => e.id.toLowerCase() === id.toLowerCase() || e.loginId.toLowerCase() === id.toLowerCase());
 }
-
 
 export async function createEmployeeInDb(
   data: Omit<Employee, "id">,
   companyId?: string,
   authUserId?: string,
 ): Promise<Employee> {
-  const activeCompanyId = companyId || await getDefaultCompanyId();
+  const userId = authUserId || crypto.randomUUID();
 
   try {
-    // The employee row shares its id with the Supabase Auth user created for
-    // them, so the system-generated password actually signs them in.
-    const tempUserId = authUserId || crypto.randomUUID();
-
-    const { data: newEmp, error } = await supabase
-      .from("employees")
+    const { error: profileError } = await supabase
+      .from("profiles")
       .insert({
-        id: tempUserId,
-        company_id: activeCompanyId,
-        login_id: data.loginId,
+        id: userId,
         first_name: data.firstName,
         last_name: data.lastName,
-        work_email: data.workEmail,
-        personal_email: data.personalEmail,
-        phone: data.mobile,
+        phone: data.mobile || null,
         role: data.role,
         department: data.department,
-        job_title: data.jobTitle,
-        joining_date: data.joiningDate,
-        dob: data.dob || null,
-        gender: data.gender || null,
-        marital_status: data.maritalStatus || null,
-        nationality: data.nationality || null,
-        address: data.address || null,
-        bank_account_no: data.bankAccountNo || null,
-        bank_name: data.bankName || null,
-        ifsc_code: data.ifsc || null,
-        pan_no: data.pan || null,
-        uan_no: data.uan || null,
-        must_change_password: true,
-      })
-      .select()
-      .single();
+        position: data.jobTitle,
+        join_date: data.joiningDate,
+        is_active: true,
+      });
 
-    if (error) throw error;
+    if (profileError) throw profileError;
 
-    // 2. Create resume row
-    await supabase.from("employee_resume").insert({
-      employee_id: newEmp.id,
-      about: data.about,
-      love_about_job: data.loveAboutJob,
-      interests: data.interests,
-      skills: data.skills,
-      certifications: data.certifications,
+    // Create salary structure row (calculate defaults based on gross monthlyWage)
+    const basic = Math.round(data.monthlyWage * 0.5);
+    const hra = Math.round(data.monthlyWage * 0.2);
+    const da = Math.round(data.monthlyWage * 0.1);
+    const allowance = data.monthlyWage - basic - hra - da;
+
+    await supabase.from("salary_structure").insert({
+      employee_id: userId,
+      basic,
+      hra,
+      da,
+      allowance,
+      pf_rate: 12.00,
+      tax_rate: 10.00,
     });
 
-    // 3. Create salary structure row
-    await supabase.from("salary_structures").insert({
-      employee_id: newEmp.id,
-      monthly_wage: data.monthlyWage,
-      working_days_month: data.workingDaysPerWeek === 6 ? 26 : 22,
-      break_hours: data.breakHours,
-      is_current: true,
+    // Create leave balance row
+    await supabase.from("leave_balance").insert({
+      employee_id: userId,
+      year: new Date().getFullYear(),
+      paid_leave: 12,
+      sick_leave: 10,
+      casual_leave: 6,
+      unpaid_leave: 0,
     });
 
-    return { ...data, id: newEmp.id };
+    return { ...data, id: userId };
   } catch (e) {
-    console.error("createEmployeeInDb failed, falling back to adding to local mock array:", e);
-    // Return the data with a mock UUID
-    return { ...data, id: crypto.randomUUID() };
+    console.error("createEmployeeInDb failed, returning fallback:", e);
+    return { ...data, id: userId };
   }
 }
 
@@ -294,38 +228,13 @@ export async function updateEmployeeInDb(id: string, updates: Partial<Employee>)
     const dbUpdates: Record<string, unknown> = {};
     if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
     if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
-    if (updates.personalEmail !== undefined) dbUpdates.personal_email = updates.personalEmail;
     if (updates.mobile !== undefined) dbUpdates.phone = updates.mobile;
     if (updates.department !== undefined) dbUpdates.department = updates.department;
-    if (updates.jobTitle !== undefined) dbUpdates.job_title = updates.jobTitle;
-    if (updates.dob !== undefined) dbUpdates.dob = updates.dob;
-    if (updates.gender !== undefined) dbUpdates.gender = updates.gender;
-    if (updates.maritalStatus !== undefined) dbUpdates.marital_status = updates.maritalStatus;
-    if (updates.nationality !== undefined) dbUpdates.nationality = updates.nationality;
-    if (updates.address !== undefined) dbUpdates.address = updates.address;
-    if (updates.bankAccountNo !== undefined) dbUpdates.bank_account_no = updates.bankAccountNo;
-    if (updates.bankName !== undefined) dbUpdates.bank_name = updates.bankName;
-    if (updates.ifsc !== undefined) dbUpdates.ifsc_code = updates.ifsc;
-    if (updates.pan !== undefined) dbUpdates.pan_no = updates.pan;
-    if (updates.uan !== undefined) dbUpdates.uan_no = updates.uan;
+    if (updates.jobTitle !== undefined) dbUpdates.position = updates.jobTitle;
+    if (updates.joiningDate !== undefined) dbUpdates.join_date = updates.joiningDate;
 
     if (Object.keys(dbUpdates).length > 0) {
-      const { error } = await supabase.from("employees").update(dbUpdates).eq("id", id);
-      if (error) throw error;
-    }
-
-    // Update resume columns if any are provided
-    const resumeUpdates: Record<string, unknown> = {};
-    if (updates.about !== undefined) resumeUpdates.about = updates.about;
-    if (updates.loveAboutJob !== undefined) resumeUpdates.love_about_job = updates.loveAboutJob;
-    if (updates.interests !== undefined) resumeUpdates.interests = updates.interests;
-    if (updates.skills !== undefined) resumeUpdates.skills = updates.skills;
-    if (updates.certifications !== undefined) resumeUpdates.certifications = updates.certifications;
-
-    if (Object.keys(resumeUpdates).length > 0) {
-      const { error } = await supabase
-        .from("employee_resume")
-        .upsert({ employee_id: id, ...resumeUpdates });
+      const { error } = await supabase.from("profiles").update(dbUpdates).eq("id", id);
       if (error) throw error;
     }
 
@@ -344,7 +253,7 @@ export async function fetchAttendanceRecords(employeeId: string, monthISO: strin
       .from("attendance")
       .select("*")
       .eq("employee_id", employeeId)
-      .like("work_date", `${monthISO}%`);
+      .like("date", `${monthISO}%`);
 
     if (error) {
       if (isMissingTableError(error)) throw error;
@@ -355,16 +264,15 @@ export async function fetchAttendanceRecords(employeeId: string, monthISO: strin
     const castedRecs = (dbRecords || []) as unknown as DbAttendance[];
 
     return castedRecs.map((rec) => ({
-      date: rec.work_date,
+      date: rec.date,
       status: rec.status,
       checkIn: rec.check_in,
       checkOut: rec.check_out,
-      workHours: Number(rec.work_hours) || 0,
-      extraHours: Number(rec.extra_hours) || 0,
+      workHours: Number(rec.hours_worked) || 0,
+      extraHours: Number(rec.hours_worked) > 8 ? (Number(rec.hours_worked) - 8) : 0,
     }));
   } catch (e) {
-    console.warn("fetchAttendanceRecords failed, using mock placeholder logic:", e);
-    // In a real environment, we return empty or stubbed array
+    console.warn("fetchAttendanceRecords failed:", e);
     return [];
   }
 }
@@ -375,7 +283,7 @@ export async function checkInEmployee(employeeId: string, workDate: string): Pro
       .from("attendance")
       .insert({
         employee_id: employeeId,
-        work_date: workDate,
+        date: workDate,
         check_in: new Date().toISOString(),
         status: "present",
       });
@@ -388,18 +296,19 @@ export async function checkInEmployee(employeeId: string, workDate: string): Pro
   }
 }
 
-export async function checkOutEmployee(employeeId: string, workDate: string, workHours: number, extraHours: number): Promise<boolean> {
+export async function checkOutEmployee(employeeId: string, workDate: string, workHours: number, _extraHours: number): Promise<boolean> {
   try {
+    void _extraHours;
     const { error } = await supabase
+
       .from("attendance")
       .update({
         check_out: new Date().toISOString(),
-        work_hours: workHours,
-        extra_hours: extraHours,
+        hours_worked: workHours,
         status: workHours >= 8 ? "present" : (workHours >= 4 ? "half_day" : "absent"),
       })
       .eq("employee_id", employeeId)
-      .eq("work_date", workDate);
+      .eq("date", workDate);
 
     if (error) throw error;
     return true;
@@ -413,10 +322,7 @@ export async function checkOutEmployee(employeeId: string, workDate: string, wor
 
 export async function fetchLeaveRequests(employeeId?: string): Promise<LeaveRequest[]> {
   try {
-    let query = supabase.from("leave_requests").select(`
-      *,
-      leave_types (code, name)
-    `);
+    let query = supabase.from("leave_requests").select("*");
 
     if (employeeId) {
       query = query.eq("employee_id", employeeId);
@@ -439,13 +345,13 @@ export async function fetchLeaveRequests(employeeId?: string): Promise<LeaveRequ
     const castedRequests = dbRequests as unknown as DbLeaveRequest[];
 
     return castedRequests.map((req) => ({
-      id: req.id,
+      id: String(req.id),
       employeeId: req.employee_id,
-      leaveType: (req.leave_types?.code as LeaveTypeCode) || "PAID",
-      startDate: req.start_date,
-      endDate: req.end_date,
-      dayCount: Number(req.day_count),
-      remarks: req.remarks || "",
+      leaveType: (req.leave_type.toUpperCase() as LeaveTypeCode) || "PAID",
+      startDate: req.from_date,
+      endDate: req.to_date,
+      dayCount: Number(req.total_days),
+      remarks: req.reason || "",
       status: req.status,
     }));
   } catch (e) {
@@ -457,11 +363,8 @@ export async function fetchLeaveRequests(employeeId?: string): Promise<LeaveRequ
 export async function fetchLeaveAllocations(employeeId: string): Promise<LeaveAllocation[]> {
   try {
     const { data: dbAllocations, error } = await supabase
-      .from("leave_allocations")
-      .select(`
-        *,
-        leave_types (code, name)
-      `)
+      .from("leave_balance")
+      .select("*")
       .eq("employee_id", employeeId);
 
     if (error) {
@@ -475,17 +378,32 @@ export async function fetchLeaveAllocations(employeeId: string): Promise<LeaveAl
       return LEAVE_ALLOCATIONS.filter((a) => a.employeeId === employeeId);
     }
 
-    const castedAllocations = dbAllocations as unknown as DbLeaveAllocation[];
+    const castedAllocations = dbAllocations as unknown as DbLeaveBalance[];
+    const result: LeaveAllocation[] = [];
 
-    return castedAllocations.map((alloc) => ({
-      id: alloc.id,
-      employeeId: alloc.employee_id,
-      leaveType: (alloc.leave_types?.code as LeaveTypeCode) || "PAID",
-      days: Number(alloc.days),
-      validFrom: alloc.valid_from,
-      validTo: alloc.valid_to,
-      note: alloc.note || "",
-    }));
+    castedAllocations.forEach((alloc) => {
+      // Maps singular yearly row to Paid + Sick leave allocations for the frontend
+      result.push({
+        id: `alloc-paid-${alloc.id}`,
+        employeeId: alloc.employee_id,
+        leaveType: "PAID",
+        days: Number(alloc.paid_leave) || 12,
+        validFrom: `${alloc.year}-01-01`,
+        validTo: `${alloc.year}-12-31`,
+        note: `Annual Paid Leave Allocation for ${alloc.year}`,
+      });
+      result.push({
+        id: `alloc-sick-${alloc.id}`,
+        employeeId: alloc.employee_id,
+        leaveType: "SICK",
+        days: Number(alloc.sick_leave) || 10,
+        validFrom: `${alloc.year}-01-01`,
+        validTo: `${alloc.year}-12-31`,
+        note: `Annual Sick Leave Allocation for ${alloc.year}`,
+      });
+    });
+
+    return result;
   } catch (e) {
     console.error("fetchLeaveAllocations failed, returning mock data:", e);
     return LEAVE_ALLOCATIONS.filter((a) => a.employeeId === employeeId);
@@ -494,28 +412,15 @@ export async function fetchLeaveAllocations(employeeId: string): Promise<LeaveAl
 
 export async function createLeaveRequestInDb(request: Omit<LeaveRequest, "id" | "status">): Promise<LeaveRequest | null> {
   try {
-    // Resolve leave type id from code
-    const { data: typeData } = await supabase
-      .from("leave_types")
-      .select("id")
-      .eq("code", request.leaveType)
-      .limit(1);
-
-    if (!typeData || typeData.length === 0) {
-      console.warn("Could not find leave type id for code, attempting direct insert with mock type id");
-    }
-
-    const leaveTypeId = typeData?.[0]?.id || crypto.randomUUID();
-
     const { data: newReq, error } = await supabase
       .from("leave_requests")
       .insert({
         employee_id: request.employeeId,
-        leave_type_id: leaveTypeId,
-        start_date: request.startDate,
-        end_date: request.endDate,
-        day_count: request.dayCount,
-        remarks: request.remarks || null,
+        leave_type: request.leaveType.toLowerCase(),
+        from_date: request.startDate,
+        to_date: request.endDate,
+        total_days: request.dayCount,
+        reason: request.remarks || "",
         status: "pending",
       })
       .select()
@@ -523,14 +428,15 @@ export async function createLeaveRequestInDb(request: Omit<LeaveRequest, "id" | 
 
     if (error) throw error;
 
+    const row = newReq as unknown as DbLeaveRequest;
     return {
-      id: newReq.id,
-      employeeId: newReq.employee_id,
+      id: String(row.id),
+      employeeId: row.employee_id,
       leaveType: request.leaveType,
-      startDate: newReq.start_date,
-      endDate: newReq.end_date,
-      dayCount: Number(newReq.day_count),
-      remarks: newReq.remarks || "",
+      startDate: row.from_date,
+      endDate: row.to_date,
+      dayCount: Number(row.total_days),
+      remarks: row.reason || "",
       status: "pending",
     };
   } catch (e) {
@@ -545,11 +451,11 @@ export async function updateLeaveRequestStatus(requestId: string, status: "appro
       .from("leave_requests")
       .update({
         status,
-        reviewed_by: reviewerId,
-        review_comment: comment || null,
-        reviewed_at: new Date().toISOString(),
+        approved_by: reviewerId,
+        admin_comment: comment || null,
+        updated_at: new Date().toISOString(),
       })
-      .eq("id", requestId);
+      .eq("id", parseInt(requestId, 10));
 
     if (error) throw error;
     return true;
@@ -561,35 +467,61 @@ export async function updateLeaveRequestStatus(requestId: string, status: "appro
 
 export async function grantLeaveAllocation(alloc: Omit<LeaveAllocation, "id">): Promise<LeaveAllocation | null> {
   try {
-    const { data: typeData } = await supabase
-      .from("leave_types")
-      .select("id")
-      .eq("code", alloc.leaveType)
-      .limit(1);
+    const year = new Date(alloc.validFrom).getFullYear();
+    
+    // Check if leave balance row exists
+    const { data: existing } = await supabase
+      .from("leave_balance")
+      .select("*")
+      .eq("employee_id", alloc.employeeId)
+      .eq("year", year)
+      .maybeSingle();
 
-    const leaveTypeId = typeData?.[0]?.id || crypto.randomUUID();
+    let savedAlloc: DbLeaveBalance;
 
-    const { data: newAlloc, error } = await supabase
-      .from("leave_allocations")
-      .insert({
+    if (existing) {
+      const existingBalance = existing as DbLeaveBalance;
+      const updateData: Record<string, number> = {};
+      if (alloc.leaveType === "PAID") {
+        updateData.paid_leave = (existingBalance.paid_leave || 0) + alloc.days;
+      } else if (alloc.leaveType === "SICK") {
+        updateData.sick_leave = (existingBalance.sick_leave || 0) + alloc.days;
+      }
+      
+      const { data, error } = await supabase
+        .from("leave_balance")
+        .update(updateData)
+        .eq("id", existingBalance.id)
+        .select()
+        .single();
+      if (error) throw error;
+      savedAlloc = data as DbLeaveBalance;
+    } else {
+      const insertData = {
         employee_id: alloc.employeeId,
-        leave_type_id: leaveTypeId,
-        days: alloc.days,
-        valid_from: alloc.validFrom,
-        valid_to: alloc.validTo,
-      })
-      .select()
-      .single();
+        year,
+        paid_leave: alloc.leaveType === "PAID" ? alloc.days : 12,
+        sick_leave: alloc.leaveType === "SICK" ? alloc.days : 10,
+        casual_leave: 6,
+        unpaid_leave: 0
+      };
 
-    if (error) throw error;
+      const { data, error } = await supabase
+        .from("leave_balance")
+        .insert(insertData)
+        .select()
+        .single();
+      if (error) throw error;
+      savedAlloc = data as DbLeaveBalance;
+    }
 
     return {
-      id: newAlloc.id,
-      employeeId: newAlloc.employee_id,
+      id: `alloc-${savedAlloc.id}`,
+      employeeId: savedAlloc.employee_id,
       leaveType: alloc.leaveType,
-      days: Number(newAlloc.days),
-      validFrom: newAlloc.valid_from,
-      validTo: newAlloc.valid_to,
+      days: Number(alloc.days),
+      validFrom: alloc.validFrom,
+      validTo: alloc.validTo,
     };
   } catch (e) {
     console.error("grantLeaveAllocation failed:", e);
@@ -597,3 +529,44 @@ export async function grantLeaveAllocation(alloc: Omit<LeaveAllocation, "id">): 
   }
 }
 
+// --- Salary Mutations ---
+
+export async function updateSalaryWageInDb(employeeId: string, wage: number): Promise<boolean> {
+  try {
+    const basic = Math.round(wage * 0.5);
+    const hra = Math.round(wage * 0.2);
+    const da = Math.round(wage * 0.1);
+    const allowance = wage - basic - hra - da;
+
+    const { data: existing } = await supabase
+      .from("salary_structure")
+      .select("*")
+      .eq("employee_id", employeeId)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from("salary_structure")
+        .update({ basic, hra, da, allowance })
+        .eq("id", (existing as { id: number }).id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("salary_structure")
+        .insert({
+          employee_id: employeeId,
+          basic,
+          hra,
+          da,
+          allowance,
+          pf_rate: 12.00,
+          tax_rate: 10.00
+        });
+      if (error) throw error;
+    }
+    return true;
+  } catch (e) {
+    console.error("updateSalaryWageInDb failed:", e);
+    return false;
+  }
+}
