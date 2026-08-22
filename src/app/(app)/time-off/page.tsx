@@ -11,6 +11,7 @@ import { CalendarLegend, YearCalendar } from "@/components/time-off/year-calenda
 import {
   HOLIDAYS,
   LEAVE_TYPES,
+  employeeInitials,
   employeeName,
   type Employee,
   leaveBalance,
@@ -18,13 +19,43 @@ import {
   type LeaveRequest,
   type RequestStatus,
 } from "@/lib/mock-data";
+import {
+  EmptyState,
+  FilterSelect,
+  PageHeader,
+  PersonCell,
+  ResultLine,
+  Row,
+  SearchInput,
+  StatusPill,
+  SummaryTile,
+  TableShell,
+  Toolbar,
+  type Tone,
+} from "@/components/ui/data-ui";
 import { fetchEmployees, fetchLeaveRequests, fetchLeaveAllocations, updateLeaveRequestStatus } from "@/lib/supabase-db";
 
+/** Employee-side table still styles status as text. */
 const STATUS_STYLE: Record<RequestStatus, string> = {
   approved: "text-success",
   pending: "text-plum",
   rejected: "text-warn",
 };
+
+const STATUS_TONE: Record<RequestStatus, Tone> = {
+  approved: "success",
+  pending: "plum",
+  rejected: "warn",
+};
+
+function formatRange(start: string, end: string) {
+  const fmt = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+    });
+  return start === end ? fmt(start) : `${fmt(start)} – ${fmt(end)}`;
+}
 
 function AdminTimeOff() {
   const { currentEmployee } = useSession();
@@ -33,6 +64,13 @@ function AdminTimeOff() {
   const [allocations, setAllocations] = useState<LeaveAllocation[]>([]);
   const [roster, setRoster] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | RequestStatus>(
+    "pending",
+  );
+  const [typeFilter, setTypeFilter] = useState("all");
 
   useEffect(() => {
     async function loadData() {
@@ -55,15 +93,73 @@ function AdminTimeOff() {
   }, [currentEmployee]);
 
   async function review(id: string, status: "approved" | "rejected") {
-    setRequests((current) => current.map((r) => (r.id === id ? { ...r, status } : r)));
-    await updateLeaveRequestStatus(id, status, currentEmployee.id);
+    setBusyId(id);
+    const previous = requests;
+    setRequests((current) =>
+      current.map((r) => (r.id === id ? { ...r, status } : r)),
+    );
+
+    const ok = await updateLeaveRequestStatus(id, status, currentEmployee.id);
+    if (!ok) setRequests(previous); // put it back rather than lie about it
+    setBusyId(null);
+  }
+
+  const counts = useMemo(() => {
+    const tally = { pending: 0, approved: 0, rejected: 0, days: 0 };
+    for (const request of requests) {
+      tally[request.status] += 1;
+      if (request.status === "pending") tally.days += request.dayCount;
+    }
+    return tally;
+  }, [requests]);
+
+  const rows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return requests
+      .map((request) => ({
+        request,
+        employee: roster.find((e) => e.id === request.employeeId),
+      }))
+      .filter(({ request, employee }) => {
+        if (statusFilter !== "all" && request.status !== statusFilter)
+          return false;
+        if (typeFilter !== "all" && request.leaveType !== typeFilter)
+          return false;
+        if (!query) return true;
+        return [
+          employee ? employeeName(employee) : request.employeeId,
+          employee?.loginId ?? "",
+          request.remarks ?? "",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+      })
+      .sort((a, b) => {
+        // Pending first — this page exists to clear a queue.
+        if (a.request.status !== b.request.status) {
+          if (a.request.status === "pending") return -1;
+          if (b.request.status === "pending") return 1;
+        }
+        return a.request.startDate.localeCompare(b.request.startDate);
+      });
+  }, [requests, roster, search, statusFilter, typeFilter]);
+
+  const filtersOn =
+    Boolean(search) || statusFilter !== "all" || typeFilter !== "all";
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setTypeFilter("all");
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <p className="font-display text-sm font-semibold text-ink/70 animate-pulse">
-          Loading requests...
+        <p className="animate-pulse font-display text-sm font-semibold text-ink/70">
+          Loading requests…
         </p>
       </div>
     );
@@ -75,63 +171,175 @@ function AdminTimeOff() {
         active={tab}
         onChange={(key) => setTab(key as "requests" | "allocation")}
         tabs={[
-          { key: "requests", label: "Time Off" },
+          { key: "requests", label: "Requests" },
           { key: "allocation", label: "Allocation" },
         ]}
       />
 
       {tab === "requests" ? (
-        <div className="overflow-hidden rounded-card border border-line">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-line bg-line/60">
-                {["Name", "Start Date", "End Date", "Type", "Status", "Actions"].map((col) => (
-                  <th
-                    key={col}
-                    className="px-4 py-3 font-display text-sm font-semibold text-ink"
-                  >
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((request) => {
-                const employee = roster.find((e) => e.id === request.employeeId);
-                const type = LEAVE_TYPES.find((t) => t.code === request.leaveType);
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <SummaryTile
+              label="Awaiting you"
+              value={counts.pending}
+              hint={counts.days > 0 ? `${counts.days} days requested` : undefined}
+              tone={counts.pending > 0 ? "warn" : "default"}
+              active={statusFilter === "pending"}
+              onClick={() =>
+                setStatusFilter(statusFilter === "pending" ? "all" : "pending")
+              }
+            />
+            <SummaryTile
+              label="Approved"
+              value={counts.approved}
+              tone="success"
+              active={statusFilter === "approved"}
+              onClick={() =>
+                setStatusFilter(statusFilter === "approved" ? "all" : "approved")
+              }
+            />
+            <SummaryTile
+              label="Rejected"
+              value={counts.rejected}
+              tone="muted"
+              active={statusFilter === "rejected"}
+              onClick={() =>
+                setStatusFilter(statusFilter === "rejected" ? "all" : "rejected")
+              }
+            />
+            <SummaryTile
+              label="All requests"
+              value={requests.length}
+              active={statusFilter === "all"}
+              onClick={() => setStatusFilter("all")}
+            />
+          </div>
+
+          <Toolbar>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search person, Login ID, reason…"
+            />
+            <FilterSelect
+              label="Status"
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as "all" | RequestStatus)}
+              options={[
+                { value: "all", label: "Any status" },
+                { value: "pending", label: "Pending" },
+                { value: "approved", label: "Approved" },
+                { value: "rejected", label: "Rejected" },
+              ]}
+            />
+            <FilterSelect
+              label="Leave type"
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={[
+                { value: "all", label: "All types" },
+                ...LEAVE_TYPES.map((t) => ({ value: t.code, label: t.name })),
+              ]}
+            />
+          </Toolbar>
+
+          <ResultLine
+            showing={rows.length}
+            total={requests.length}
+            noun="requests"
+            onClear={filtersOn ? clearFilters : undefined}
+          />
+
+          {rows.length === 0 ? (
+            <EmptyState
+              title={
+                counts.pending === 0 && statusFilter === "pending"
+                  ? "Nothing waiting on you."
+                  : "No requests match those filters."
+              }
+              description={
+                counts.pending === 0 && statusFilter === "pending"
+                  ? "Every request has been reviewed. New ones land here the moment they are submitted."
+                  : "Try another status or leave type, or clear the filters."
+              }
+              onClear={filtersOn ? clearFilters : undefined}
+            />
+          ) : (
+            <TableShell
+              minWidth="58rem"
+              columns={[
+                "Employee",
+                "Type",
+                "Dates",
+                "Days",
+                "Reason",
+                "Status",
+                "",
+              ]}
+            >
+              {rows.map(({ request, employee }) => {
+                const type = LEAVE_TYPES.find(
+                  (t) => t.code === request.leaveType,
+                );
                 return (
-                  <tr key={request.id} className="border-b border-line/60">
-                    <td className="px-4 py-3 font-display text-sm text-ink">
-                      {employee ? employeeName(employee) : request.employeeId}
-                    </td>
-                    <td className="px-4 py-3 font-display text-sm tabular-nums text-ink">
-                      {request.startDate}
-                    </td>
-                    <td className="px-4 py-3 font-display text-sm tabular-nums text-ink">
-                      {request.endDate}
-                    </td>
-                    <td className="px-4 py-3 font-display text-sm text-ink">
-                      {type?.name ?? request.leaveType}
-                    </td>
-                    <td
-                      className={`px-4 py-3 font-display text-sm font-semibold capitalize ${STATUS_STYLE[request.status]}`}
-                    >
-                      {request.status}
+                  <Row key={request.id}>
+                    <td className="px-4 py-3">
+                      <PersonCell
+                        initials={
+                          employee ? employeeInitials(employee) : "??"
+                        }
+                        name={
+                          employee ? employeeName(employee) : request.employeeId
+                        }
+                        meta={employee?.loginId}
+                        href={
+                          employee ? `/employees/${employee.id}` : undefined
+                        }
+                      />
                     </td>
                     <td className="px-4 py-3">
+                      <StatusPill
+                        label={type?.name ?? request.leaveType}
+                        tone={type?.isPaid ? "plum" : "muted"}
+                        dot={false}
+                      />
+                    </td>
+                    <td className="px-4 py-3 font-display text-sm tabular-nums text-ink">
+                      {formatRange(request.startDate, request.endDate)}
+                    </td>
+                    <td className="px-4 py-3 font-display text-sm tabular-nums text-ink">
+                      {request.dayCount}
+                    </td>
+                    <td className="max-w-[18rem] px-4 py-3">
+                      <span className="block truncate font-body text-[14px] text-ink/70">
+                        {request.remarks || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusPill
+                        label={
+                          request.status.charAt(0).toUpperCase() +
+                          request.status.slice(1)
+                        }
+                        tone={STATUS_TONE[request.status]}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right">
                       {request.status === "pending" ? (
-                        <div className="flex gap-2">
+                        <div className="flex justify-end gap-2">
                           <button
                             type="button"
+                            disabled={busyId === request.id}
                             onClick={() => review(request.id, "approved")}
-                            className="rounded-pill bg-success/15 px-3 py-1 font-display text-xs font-semibold text-success"
+                            className="rounded-pill bg-success/15 px-3 py-1.5 font-display text-xs font-semibold text-success transition-colors hover:bg-success/25 disabled:opacity-50"
                           >
                             Approve
                           </button>
                           <button
                             type="button"
+                            disabled={busyId === request.id}
                             onClick={() => review(request.id, "rejected")}
-                            className="rounded-pill bg-warn/15 px-3 py-1 font-display text-xs font-semibold text-warn"
+                            className="rounded-pill bg-warn/15 px-3 py-1.5 font-display text-xs font-semibold text-warn transition-colors hover:bg-warn/25 disabled:opacity-50"
                           >
                             Reject
                           </button>
@@ -142,12 +350,12 @@ function AdminTimeOff() {
                         </span>
                       )}
                     </td>
-                  </tr>
+                  </Row>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </TableShell>
+          )}
+        </>
       ) : (
         <AllocationPanel
           allocations={allocations}
@@ -332,17 +540,16 @@ function TimeOffPageInner() {
   const { role } = useSession();
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="font-display text-[30px] font-extrabold tracking-tight text-ink">
-          Time Off
-        </h1>
-        <p className="mt-1 font-body text-[15px] text-ink/70">
-          {role === "admin"
-            ? "Review requests and manage leave allocations."
-            : "Apply for leave and track your balance."}
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        eyebrow="Leave"
+        title="Time Off"
+        description={
+          role === "admin"
+            ? "Clear the approval queue and manage allocations. Approved leave feeds straight into attendance and payroll."
+            : "Apply for leave and track your balance."
+        }
+      />
 
       {role === "admin" ? <AdminTimeOff /> : <EmployeeTimeOff />}
     </div>

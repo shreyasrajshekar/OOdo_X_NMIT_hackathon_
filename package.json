@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "send-credentials": "tsx --env-file=.env.local scripts/send-credentials.ts",
     "test": "vitest run"
   },
   "dependencies": {

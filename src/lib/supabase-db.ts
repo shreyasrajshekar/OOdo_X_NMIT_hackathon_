@@ -294,6 +294,44 @@ export async function fetchAttendanceRecords(employeeId: string, monthISO: strin
   }
 }
 
+/**
+ * Every attendance row for one date, keyed by employee.
+ *
+ * The directory needs today's presence for the whole company at once; asking
+ * per employee would be one round trip per row.
+ */
+export async function fetchAttendanceForDate(
+  workDate: string,
+): Promise<Record<string, AttendanceRecord>> {
+  try {
+    const { data, error } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("date", workDate);
+
+    if (error) throw error;
+
+    const byEmployee: Record<string, AttendanceRecord> = {};
+
+    for (const row of (data || []) as unknown as DbAttendance[]) {
+      const hours = Number(row.hours_worked) || 0;
+      byEmployee[row.employee_id] = {
+        date: row.date,
+        status: row.status,
+        checkIn: row.check_in,
+        checkOut: row.check_out,
+        workHours: hours,
+        extraHours: hours > 8 ? hours - 8 : 0,
+      };
+    }
+
+    return byEmployee;
+  } catch (e) {
+    console.warn("fetchAttendanceForDate failed:", e);
+    return {};
+  }
+}
+
 /** Result of a write, carrying the reason when it fails so the UI can say so. */
 export type WriteResult = { ok: boolean; error?: string };
 
