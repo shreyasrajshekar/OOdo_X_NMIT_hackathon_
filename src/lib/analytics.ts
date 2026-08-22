@@ -1,5 +1,28 @@
 import { supabase } from '@/lib/supabase';
-import { Database } from '@/types/database';
+import type { Database } from '@/types/database';
+
+type Row<T extends keyof Database['public']['Tables']> =
+  Database['public']['Tables'][T]['Row'];
+
+/**
+ * PostgREST returns an embedded to-one relation as an object or as a
+ * single-element array depending on how it infers the relationship, so every
+ * read of `profiles` below has to cope with both.
+ */
+type ProfileRef = { first_name?: string | null; last_name?: string | null; department?: string | null };
+type Embedded<T> = T | T[] | null;
+
+type AttendanceRow = Pick<Row<'attendance'>, 'employee_id' | 'date' | 'status' | 'check_in'> & {
+  profiles: Embedded<ProfileRef>;
+};
+type LeaveRow = Pick<Row<'leave_requests'>, 'leave_type' | 'status' | 'created_at'> & {
+  profiles: Embedded<ProfileRef>;
+};
+type SalaryRow = Pick<
+  Row<'salary_records'>,
+  'month' | 'year' | 'basic' | 'hra' | 'da' | 'allowance'
+  | 'pf_deduction' | 'tax_deduction' | 'other_deduction' | 'net_pay' | 'status'
+> & { profiles: Embedded<ProfileRef> };
 
 export interface AttendanceAnalytics {
   summary: { total_employees: number, present_days: number, absent_days: number, half_days: number, leave_days: number, attendance_rate: number };
@@ -70,7 +93,7 @@ export async function getAttendanceAnalytics(month?: number, year?: number): Pro
     };
   }
 
-  const records = attendanceData as any[];
+  const records = attendanceData as unknown as AttendanceRow[];
   const uniqueEmployees = new Set();
   let presentDays = 0, absentDays = 0, halfDays = 0, leaveDays = 0;
   
@@ -125,8 +148,12 @@ export async function getAttendanceAnalytics(month?: number, year?: number): Pro
     rate: calcRate(counts.present, counts.half_day, counts.absent, counts.leave)
   })).sort((a, b) => a.department.localeCompare(b.department));
 
-  const by_employee = Object.entries(empMap).map(([employee_id, data]) => ({
+  // empMap keys the department as `dept`; the exported type (and the page)
+  // both expect `department`, so rename it here rather than spreading the
+  // wrong key through.
+  const by_employee = Object.entries(empMap).map(([employee_id, { dept, ...data }]) => ({
     employee_id,
+    department: dept,
     ...data,
     rate: calcRate(data.present, data.half_day, data.absent, data.leave)
   })).sort((a, b) => b.rate - a.rate);
@@ -176,7 +203,7 @@ export async function getLeaveAnalytics(month?: number, year?: number): Promise<
     .gte('created_at', sixMonthsAgo)
     .lte('created_at', endDate + 'T23:59:59Z');
 
-  const records = (allData || []) as any[];
+  const records = (allData || []) as unknown as LeaveRow[];
 
   let totalRequested = 0, approved = 0, rejected = 0, pending = 0;
   const typeMap: Record<string, number> = {};
@@ -190,6 +217,9 @@ export async function getLeaveAnalytics(month?: number, year?: number): Promise<
   }
 
   for (const row of records) {
+    // created_at is nullable in the schema. A request with no timestamp cannot
+    // be placed on the trend, so skip it rather than charting it as 1970.
+    if (!row.created_at) continue;
     const rowDate = new Date(row.created_at);
     const rowY = rowDate.getUTCFullYear();
     const rowM = rowDate.getUTCMonth() + 1;
@@ -254,9 +284,9 @@ export async function getPayrollAnalytics(month?: number, year?: number): Promis
       profiles ( department )
     `);
 
-  const records = (allData || []) as any[];
+  const records = (allData || []) as unknown as SalaryRow[];
 
-  let totalPayroll = 0, pf = 0, tax = 0, absence = 0, other = 0, count = 0;
+  let totalPayroll = 0, pf = 0, tax = 0, other = 0, count = 0;
   const deptMap: Record<string, { total: number, count: number }> = {};
   const trendMap: Record<string, number> = {};
 
@@ -330,8 +360,14 @@ export async function getEmployeeAnalytics(): Promise<EmployeeAnalytics> {
     .select('employee_id, paid_leave, sick_leave, casual_leave')
     .eq('year', new Date().getFullYear());
 
-  const records = (profiles || []) as any[];
-  const balRecords = (balances || []) as any[];
+  const records = (profiles || []) as Pick<
+    Row<'profiles'>,
+    'id' | 'first_name' | 'last_name' | 'department' | 'role' | 'position' | 'join_date'
+  >[];
+  const balRecords = (balances || []) as Pick<
+    Row<'leave_balance'>,
+    'employee_id' | 'paid_leave' | 'sick_leave' | 'casual_leave'
+  >[];
 
   const deptMap: Record<string, number> = {};
   const roleMap: Record<string, number> = {};
@@ -343,8 +379,12 @@ export async function getEmployeeAnalytics(): Promise<EmployeeAnalytics> {
     roleMap[role] = (roleMap[role] || 0) + 1;
   }
 
+  // join_date is nullable. Someone with no joining date cannot be ranked as a
+  // recent joiner, and passing null to Date() would sort them as 1970 rather
+  // than dropping them.
   const recent_joiners = records
-    .sort((a, b) => new Date(b.join_date).getTime() - new Date(a.join_date).getTime())
+    .filter((r) => r.join_date)
+    .sort((a, b) => new Date(b.join_date!).getTime() - new Date(a.join_date!).getTime())
     .slice(0, 10)
     .map(r => ({
       id: r.id,

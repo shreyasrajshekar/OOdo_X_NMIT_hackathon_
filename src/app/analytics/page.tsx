@@ -85,13 +85,13 @@ export default function AnalyticsPage() {
         
         
         {/* PAGE HEADER */}
-        <div className="flex items-center gap-3 mb-6 enter" style={{ "--enter-delay": "0ms" } as any}>
+        <div className="flex items-center gap-3 mb-6 enter" style={{ "--enter-delay": "0ms" } as React.CSSProperties}>
           <BarChart3 className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-display font-bold text-ink">Analytics</h1>
         </div>
 
         {/* MONTH/YEAR SELECTOR */}
-        <div className="flex items-center justify-center gap-4 mb-8 enter" style={{ "--enter-delay": "0ms" } as any}>
+        <div className="flex items-center justify-center gap-4 mb-8 enter" style={{ "--enter-delay": "0ms" } as React.CSSProperties}>
           <button
             onClick={handlePrevMonth}
             className="p-2 rounded-card bg-line/50 hover:bg-line text-ink transition-colors"
@@ -113,7 +113,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* TAB BAR */}
-        <div className="flex gap-2 bg-line/30 rounded-card p-1.5 mb-8 border border-line overflow-x-auto enter" style={{ "--enter-delay": "50ms" } as any}>
+        <div className="flex gap-2 bg-line/30 rounded-card p-1.5 mb-8 border border-line overflow-x-auto enter" style={{ "--enter-delay": "50ms" } as React.CSSProperties}>
           {[
             { id: 'attendance', label: 'Attendance', icon: BarChart3 },
             { id: 'leave', label: 'Leave', icon: CalendarOff },
@@ -125,7 +125,7 @@ export default function AnalyticsPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`flex items-center gap-2 px-5 py-2.5 text-sm font-display font-semibold rounded-[10px] transition-all whitespace-nowrap ${
                   isActive
                     ? 'bg-primary text-paper shadow-sm'
@@ -141,17 +141,17 @@ export default function AnalyticsPage() {
 
         {/* CONTENT */}
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 enter" style={{ "--enter-delay": "100ms" } as any}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 enter" style={{ "--enter-delay": "100ms" } as React.CSSProperties}>
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="animate-pulse bg-line/60 rounded-card h-32" />
             ))}
           </div>
         ) : !data ? (
-          <div className="flex items-center justify-center h-64 text-ink/50 font-body enter" style={{ "--enter-delay": "100ms" } as any}>
+          <div className="flex items-center justify-center h-64 text-ink/50 font-body enter" style={{ "--enter-delay": "100ms" } as React.CSSProperties}>
             No data available for this period
           </div>
         ) : (
-          <div className="enter opacity-100 transition-opacity duration-200" style={{ "--enter-delay": "100ms" } as any}>
+          <div className="enter opacity-100 transition-opacity duration-200" style={{ "--enter-delay": "100ms" } as React.CSSProperties}>
             {activeTab === 'attendance' && <AttendanceTab data={data.attendance} />}
             {activeTab === 'leave' && <LeaveTab data={data.leave} />}
             {activeTab === 'payroll' && <PayrollTab data={data.payroll} />}
@@ -331,19 +331,6 @@ function AttendanceTab({ data }: { data: AllAnalytics['attendance'] }) {
     </div>
   );
 }
-
-function PlaceholderTab({ title, icon: Icon }: { title: string, icon: any }) {
-  return (
-    <div className="premium-card p-12 flex flex-col items-center justify-center text-center">
-      <div className="w-16 h-16 rounded-full bg-line/50 flex items-center justify-center mb-4">
-        <Icon className="w-8 h-8 text-primary/60" />
-      </div>
-      <h2 className="text-xl font-display font-bold text-primary">{title}</h2>
-      <p className="text-sm font-body text-ink/60 mt-2">Coming soon in the next update.</p>
-    </div>
-  );
-}
-
 
 function formatCurrency(amount: number): string {
   return "₹" + amount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
