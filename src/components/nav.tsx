@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/demo-session-provider";
 import { useAdminActions } from "@/components/admin-actions-provider";
+import { Logo } from "@/components/ui/brand";
 import { employeeInitials, employeeName } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
 import {
@@ -98,9 +99,12 @@ export function Nav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link
           href="/employees"
-          className="font-display text-lg font-extrabold tracking-tight text-primary transition-opacity hover:opacity-90"
+          className="flex items-center gap-2.5 transition-opacity hover:opacity-90"
         >
-          Dayflow
+          <Logo size={30} priority />
+          <span className="font-display text-lg font-extrabold tracking-tight text-primary">
+            Dayflow
+          </span>
         </Link>
 
         <nav className="flex items-center gap-8">

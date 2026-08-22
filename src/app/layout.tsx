@@ -23,6 +23,17 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Dayflow — HRMS",
   description: "Every workday, perfectly aligned.",
+  // src/app/icon.png and src/app/apple-icon.png are picked up automatically;
+  // this keeps the shortcut icon explicit for older browsers.
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
+  openGraph: {
+    title: "Dayflow — HRMS",
+    description: "Every workday, perfectly aligned.",
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({
