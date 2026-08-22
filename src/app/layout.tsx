@@ -45,7 +45,24 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${manrope.variable} ${sourceSerif.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const stored = localStorage.getItem('theme');
+                if (stored === 'dark') {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-screen font-display antialiased relative">
         <div className="paper-grain" aria-hidden="true" />
         {children}
