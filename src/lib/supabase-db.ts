@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { EMPLOYEES, LEAVE_ALLOCATIONS, LEAVE_REQUESTS, type Employee, type LeaveRequest, type LeaveAllocation, type AttendanceRecord, type AttendanceStatus, type RequestStatus, type Department } from "./mock-data";
+import { EMPLOYEES, LEAVE_ALLOCATIONS, LEAVE_REQUESTS, type Employee, type LeaveRequest, type LeaveAllocation, type AttendanceRecord, type AttendanceStatus, type RequestStatus, type Department, type LeaveTypeCode } from "./mock-data";
 
 // Helper to determine if a database error is a missing table (PGRST205)
 function isMissingTableError(error: { code?: string; message?: string } | null | undefined): boolean {
@@ -421,7 +421,7 @@ export async function fetchLeaveRequests(employeeId?: string): Promise<LeaveRequ
     return castedRequests.map((req) => ({
       id: req.id,
       employeeId: req.employee_id,
-      leaveType: req.leave_types?.code || "PAID",
+      leaveType: (req.leave_types?.code as LeaveTypeCode) || "PAID",
       startDate: req.start_date,
       endDate: req.end_date,
       dayCount: Number(req.day_count),
@@ -460,7 +460,7 @@ export async function fetchLeaveAllocations(employeeId: string): Promise<LeaveAl
     return castedAllocations.map((alloc) => ({
       id: alloc.id,
       employeeId: alloc.employee_id,
-      leaveType: alloc.leave_types?.code || "PAID",
+      leaveType: (alloc.leave_types?.code as LeaveTypeCode) || "PAID",
       days: Number(alloc.days),
       validFrom: alloc.valid_from,
       validTo: alloc.valid_to,
