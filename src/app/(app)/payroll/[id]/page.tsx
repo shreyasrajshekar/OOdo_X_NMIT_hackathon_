@@ -1,45 +1,41 @@
-export default async function PayrollPage({
+"use client";
+
+import { use } from "react";
+import { useDemoSession } from "@/components/demo-session-provider";
+import { SalaryInfoPanel } from "@/components/employees/salary-info-panel";
+import { employeeName, getEmployee } from "@/lib/mock-data";
+
+export default function PayrollPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const { id } = use(params);
+  const { role } = useDemoSession();
+  const employee = getEmployee(id);
+
+  if (!employee) {
+    return (
+      <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-line py-24 text-center">
+        <p className="font-display text-sm font-semibold text-ink">
+          Employee not found.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-plum">
-          {id}
+          {employee.loginId}
         </p>
         <h1 className="mt-1 font-display text-[30px] font-extrabold tracking-tight text-ink">
-          Salary Info
+          Salary Info — {employeeName(employee)}
         </h1>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="rounded-card border border-line p-6">
-          <h2 className="font-display text-lg font-bold text-ink">Wage</h2>
-          <p className="mt-2 font-body text-[15px] text-ink/70">
-            Wage type, monthly wage, yearly wage, working days, break hours.
-          </p>
-        </div>
-        <div className="rounded-card border border-line p-6">
-          <h2 className="font-display text-lg font-bold text-ink">
-            Components
-          </h2>
-          <p className="mt-2 font-body text-[15px] text-ink/70">
-            Component table with live-recalculating amounts.
-          </p>
-        </div>
-        <div className="rounded-card border border-line p-6">
-          <h2 className="font-display text-lg font-bold text-ink">
-            Deductions
-          </h2>
-          <p className="mt-2 font-body text-[15px] text-ink/70">
-            PF contribution and professional tax.
-          </p>
-        </div>
-      </div>
+      <SalaryInfoPanel employee={employee} editable={role === "admin"} />
     </div>
   );
 }

@@ -1,15 +1,56 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // No backend yet — Phase 1 wires this to the change-password server action.
-    router.push("/employees");
+    setErrorMsg("");
+
+    if (password !== confirmPassword) {
+      setErrorMsg("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // 1. Update password in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.updateUser({
+        password: password,
+      });
+
+      if (authError) {
+        setErrorMsg(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      const userId = authData.user?.id;
+      if (userId) {
+        // 2. Set must_change_password = false in the employees table
+        await supabase
+          .from("employees")
+          .update({ must_change_password: false })
+          .eq("id", userId);
+      }
+
+      router.push("/employees");
+    } catch (err) {
+      setErrorMsg("An unexpected error occurred.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -24,6 +65,12 @@ export default function ChangePasswordPage() {
         </p>
       </div>
 
+      {errorMsg && (
+        <div className="rounded border border-warn/30 bg-warn/10 p-3 text-sm text-warn">
+          {errorMsg}
+        </div>
+      )}
+
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1.5">
           <span className="font-display text-sm font-semibold text-ink">
@@ -31,6 +78,10 @@ export default function ChangePasswordPage() {
           </span>
           <input
             type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
             className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
           />
         </label>
@@ -41,14 +92,19 @@ export default function ChangePasswordPage() {
           </span>
           <input
             type="password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={loading}
             className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
           />
         </label>
 
-        <Button type="submit" className="mt-2 w-full">
-          Continue
+        <Button type="submit" disabled={loading} className="mt-2 w-full">
+          {loading ? "Updating password..." : "Continue"}
         </Button>
       </form>
     </div>
   );
 }
+

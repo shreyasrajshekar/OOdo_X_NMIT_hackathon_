@@ -2,15 +2,58 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 export default function SignInPage() {
   const router = useRouter();
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // No backend yet — Phase 1 wires this to Supabase Auth.
-    router.push("/employees");
+    setErrorMsg("");
+    setLoading(true);
+
+    try {
+      let emailInput = identifier.trim();
+
+      // If it's a login ID (doesn't contain @), resolve it to work email
+      if (!emailInput.includes("@")) {
+        const { data, error } = await supabase
+          .from("employees")
+          .select("work_email")
+          .eq("login_id", emailInput.toUpperCase())
+          .maybeSingle();
+
+        if (error) {
+          console.warn("Error looking up login ID:", error.message);
+        }
+
+        if (data?.work_email) {
+          emailInput = data.work_email;
+        }
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailInput,
+        password: password,
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
+      } else {
+        router.push("/employees");
+      }
+    } catch (err) {
+      setErrorMsg("An unexpected error occurred during sign in.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -24,6 +67,12 @@ export default function SignInPage() {
         </p>
       </div>
 
+      {errorMsg && (
+        <div className="rounded border border-warn/30 bg-warn/10 p-3 text-sm text-warn">
+          {errorMsg}
+        </div>
+      )}
+
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1.5">
           <span className="font-display text-sm font-semibold text-ink">
@@ -31,6 +80,10 @@ export default function SignInPage() {
           </span>
           <input
             type="text"
+            required
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            disabled={loading}
             className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
           />
         </label>
@@ -41,12 +94,16 @@ export default function SignInPage() {
           </span>
           <input
             type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
             className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
           />
         </label>
 
-        <Button type="submit" className="mt-2 w-full">
-          Sign in
+        <Button type="submit" disabled={loading} className="mt-2 w-full">
+          {loading ? "Signing in..." : "Sign in"}
         </Button>
       </form>
 
@@ -59,3 +116,4 @@ export default function SignInPage() {
     </div>
   );
 }
+
