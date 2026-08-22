@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #5c3d54; /* nav, primary action, headline emphasis, selected */
+  --color-plum: #875a7b; /* tints, chips, hover, secondary buttons, illustration */
+  --color-ink: #201a1e; /* headlines and body */
+  --color-line: #ede5eb; /* dividers, table stripes, card fills */
+  --color-paper: #fbf9fb; /* page background */
+  --color-success: #17a67f; /* confirmation, positive delta only */
+  --color-warn: #b4552d; /* clay, resolves the palette gap, 4.5:1 on paper */
+
+  --font-display: var(--font-manrope), sans-serif;
+  --font-body: var(--font-source-serif), serif;
+  --font-mono: var(--font-plex-mono), monospace;
+
+  --radius-pill: 999px;
+  --radius-card: 4px;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
