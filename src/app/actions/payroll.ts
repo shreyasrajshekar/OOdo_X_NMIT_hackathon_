@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   computeDeductions,
+  isWeekend,
   lopDays,
   payableDays,
   prorate,
@@ -44,6 +45,8 @@ export type PayslipResult =
       lopDays: number;
       /** What drove the LOP, so the number is explainable rather than asserted. */
       breakdown: { absentDays: number; halfDays: number; unpaidLeaveDays: number };
+      /** Holidays that came off working days this period. */
+      holidays: { date: string; name: string }[];
       earnings: PayslipLine[];
       deductions: { code: string; name: string; amount: number }[];
       gross: number;
@@ -56,8 +59,13 @@ function iso(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Days of an approved leave request that fall inside the period, excluding weekends. */
-function leaveDaysInPeriod(from: string, to: string, period: DayPeriod): number {
+/** Working days of an approved leave request inside the period: no weekends, no holidays. */
+function leaveDaysInPeriod(
+  from: string,
+  to: string,
+  period: DayPeriod,
+  holidays: Set<string>,
+): number {
   const start = from > period.start ? from : period.start;
   const end = to < period.end ? to : period.end;
   if (start > end) return 0;
@@ -66,7 +74,8 @@ function leaveDaysInPeriod(from: string, to: string, period: DayPeriod): number 
   const last = new Date(end + "T00:00:00Z");
   for (; d <= last; d.setUTCDate(d.getUTCDate() + 1)) {
     const day = d.getUTCDay();
-    if (day !== 0 && day !== 6) n += 1;
+    const iso = d.toISOString().slice(0, 10);
+    if (day !== 0 && day !== 6 && !holidays.has(iso)) n += 1;
   }
   return n;
 }
@@ -96,8 +105,13 @@ export async function generatePayslip(params: {
     end: iso(new Date(Date.UTC(year, month, 0))),
   };
 
-  const [{ data: profile }, { data: structure }, { data: attendance }, { data: leaves }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: structure },
+    { data: attendance },
+    { data: leaves },
+    { data: holidayRows },
+  ] = await Promise.all([
       admin
         .from("profiles")
         .select("first_name,last_name,position,department,login_id")
@@ -121,6 +135,12 @@ export async function generatePayslip(params: {
         .eq("status", "approved")
         .lte("from_date", period.end)
         .gte("to_date", period.start),
+      admin
+        .from("holidays")
+        .select("date,name,kind")
+        .gte("date", period.start)
+        .lte("date", period.end)
+        .neq("kind", "optional"),
     ]);
 
   if (!profile) return { ok: false, error: "Employee not found." };
@@ -131,17 +151,27 @@ export async function generatePayslip(params: {
     };
   }
 
-  // No holidays table in this schema yet, so working days are calendar days
-  // minus weekends only. When holidays arrive, they belong in this set.
-  const holidays = new Set<string>();
+  // Optional/restricted holidays are excluded: they are the employee's to take
+  // or not, so they cannot come off everyone's working days.
+  const observed = (holidayRows ?? []).filter((h) => !isWeekend(h.date));
+  const holidays = new Set(observed.map((h) => h.date));
   const working = workingDays(period, holidays);
 
-  const rows = attendance ?? [];
+  // Only days that were working days can cost anyone pay. The seed has people
+  // marked absent on Labour Day and half-day on the company holiday; counting
+  // those as loss of pay would dock them twice, since the holiday has already
+  // come out of the working-day divisor.
+  const isWorkingDay = (d: string) => !isWeekend(d) && !holidays.has(d);
+
+  const rows = (attendance ?? []).filter((r) => isWorkingDay(r.date));
   const absentDays = rows.filter((r) => r.status === "absent").map((r) => r.date);
   const halfDayCount = rows.filter((r) => r.status === "half_day").length;
   const unpaidLeaveDays = (leaves ?? [])
     .filter((l) => l.leave_type === "unpaid")
-    .reduce((sum, l) => sum + leaveDaysInPeriod(l.from_date, l.to_date, period), 0);
+    .reduce(
+      (sum, l) => sum + leaveDaysInPeriod(l.from_date, l.to_date, period, holidays),
+      0,
+    );
 
   const lop = lopDays({ absentDays, anomalyDays: [], halfDayCount, unpaidLeaveDays });
   const payable = payableDays(working, lop);
@@ -216,6 +246,7 @@ export async function generatePayslip(params: {
     payableDays: payable,
     lopDays: lop,
     breakdown: { absentDays: absentDays.length, halfDays: halfDayCount, unpaidLeaveDays },
+    holidays: observed.map((h) => ({ date: h.date, name: h.name })),
     earnings,
     deductions,
     gross,

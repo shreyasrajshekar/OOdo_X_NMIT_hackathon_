@@ -127,6 +127,20 @@ export default function PayrollPage({
             />
           </div>
 
+          {result.holidays.length > 0 && (
+            <p className="font-body text-sm text-ink/70">
+              <span className="font-semibold text-ink">
+                {result.holidays.length} holiday
+                {result.holidays.length > 1 ? "s" : ""}
+              </span>{" "}
+              already excluded from working days:{" "}
+              {result.holidays
+                .map((h) => `${h.name} (${h.date.slice(8)}/${h.date.slice(5, 7)})`)
+                .join(", ")}
+              .
+            </p>
+          )}
+
           {result.lopDays > 0 && (
             <p className="font-body text-sm text-ink/70">
               Loss of pay comes from{" "}
