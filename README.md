@@ -29,9 +29,13 @@ The demo is built around three moments:
 
 ## Status
 
-Scaffold and database are in: design tokens, nav shell and route stubs for every screen,
-plus the schema, RLS, functions and storage that live in `supabase/`. Not wired up
-yet — auth, the salary engine and realtime attendance. See [Next steps](#next-steps-phase-1).
+Database, auth and the screens are in and talking to each other: sign-in and sign-up,
+the employee directory and profiles, attendance, time off, and the automation layer
+(notifications, the audit log and the scheduled jobs behind them).
+
+Still open: the salary component engine and payslip generation, realtime on the status
+dots, and sign-in by Login ID against the database rather than mock data — `profiles`
+has no `login_id` column yet. See [Next steps](#next-steps).
 
 ## Stack
 
@@ -44,15 +48,19 @@ yet — auth, the salary engine and realtime attendance. See [Next steps](#next-
 ```bash
 npm install
 cp .env.example .env.local    # fill in from the Supabase dashboard
+npm run seed                  # optional: 25 people and a month of attendance
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). It redirects to `/sign-in`.
 
-The keys aren't committed — the repo is public, so grab them from the team chat. Nothing
-imports the Supabase client yet, so the screens still render without `.env.local`; you'll
-need it the moment auth lands. Migrations apply `0001` → `0012` in order, in
-[`supabase/`](supabase/README.md).
+The keys aren't committed — the repo is public, so grab them from the team chat.
+`.env.local` is required: the screens read from Supabase on load, so without it the app
+throws on the first render rather than degrading. `npm run seed` additionally needs the
+service-role key, since people are created through the admin auth API.
+
+Migrations apply in filename order, `001` → `009`. Full breakdown in
+[`supabase/README.md`](supabase/README.md).
 
 ## Structure
 
@@ -89,21 +97,27 @@ See `DAYFLOW_BUILD_GUIDE.md` and `2b-two-plums-design-system.md` for the full sp
 
 ## Database
 
-The migrations define 14 tables plus a derived `leave_balances` view, 4 enums, 33 RLS
-policies, 9 triggers and 4 storage buckets. The rules that matter live in Postgres rather than in the app, so they hold
+Ten tables, thirty RLS policies, five triggers, eight scheduled jobs and four storage
+buckets. The rules that matter live in Postgres rather than in the app, so they hold
 whichever screen writes the row:
 
-- Leave balances are derived from allocations minus approved requests — no counter to drift
-  — and a gist exclusion constraint rejects overlapping requests at insert.
-- Attendance hours and the salary audit trail are triggers.
-- Login IDs are generated under a row lock, so two signups at once can't collide.
+- Attendance hours are computed by a trigger on check-out, not by the client.
+- Approving leave decrements the balance and writes the attendance rows in one
+  transaction.
+- Notifications are rate-limited in the database — `notification_caps` holds a cooldown
+  per type and `should_notify()` is the gate, so a noisy rule can't spam anyone.
+- Eight `pg_cron` jobs run the unattended half: mark absent, auto check-out, chase stale
+  approvals, morning brief, monthly payroll prep.
 - Salary RLS is row-scoped: an employee sees their own structure and nothing else.
 
 Setup steps and the full breakdown are in [`supabase/README.md`](supabase/README.md).
 
-## Next steps (Phase 1)
+## Next steps
 
-- Auth wiring: sign-in by login ID, forced password change, session middleware
-- Employee create/edit against the real tables
 - Salary component engine + payslip generation
 - Realtime attendance on the status dots
+- `login_id` on `profiles`, so signing in by Login ID stops going through mock data
+- Forced password change — `profiles` has no `must_change_password` column, so the
+  `/change-password` route exists but nothing routes you to it
+- Clean up the enums and functions left behind by the old schema (see
+  [`supabase/README.md`](supabase/README.md))
