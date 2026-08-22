@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmployeeCard } from "@/components/employee-card";
 import { useSession } from "@/components/demo-session-provider";
+import { AdminGuard } from "@/components/admin-guard";
 import { useAdminActions } from "@/components/admin-actions-provider";
 import { employeeName, type Employee } from "@/lib/mock-data";
 import { fetchEmployees } from "@/lib/supabase-db";
 
-export default function EmployeesPage() {
+function EmployeesPageInner() {
   const { isAdmin } = useSession();
   const { openAddUser, onUserCreated } = useAdminActions();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -102,5 +103,14 @@ export default function EmployeesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Admin/HR only — employees are redirected to their own workspace. */
+export default function EmployeesPage() {
+  return (
+    <AdminGuard>
+      <EmployeesPageInner />
+    </AdminGuard>
   );
 }

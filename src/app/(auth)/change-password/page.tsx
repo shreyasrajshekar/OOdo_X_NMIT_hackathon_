@@ -45,7 +45,7 @@ export default function ChangePasswordPage() {
       }
 
 
-      router.push("/employees");
+      router.push("/dashboard");
     } catch (err) {
       setErrorMsg("An unexpected error occurred.");
       console.error(err);

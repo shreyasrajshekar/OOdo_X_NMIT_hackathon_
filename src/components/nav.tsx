@@ -15,11 +15,14 @@ import {
 } from "@/lib/supabase-db";
 import NotificationBell from "@/components/automation/NotificationBell";
 
-const LINKS = [
+const COMMON_LINKS = [
   { href: "/employees", label: "Employees" },
   { href: "/attendance", label: "Attendance" },
   { href: "/time-off", label: "Time Off" },
 ] as const;
+
+/** Everyone's own stats, check-in and leave live here — admins included. */
+const HOME_LINK = { href: "/dashboard", label: "My Workspace" } as const;
 
 function formatTime(date: Date) {
   return date.toLocaleTimeString(undefined, {
@@ -33,8 +36,14 @@ export function Nav() {
   const pathname = usePathname();
   const { role, isAdmin, currentEmployee } = useSession();
   const { canAddUsers, openAddUser } = useAdminActions();
+  // Company-wide screens belong to Admin/HR. Employees get their workspace.
+  const navLinks = isAdmin
+    ? ([HOME_LINK, ...COMMON_LINKS] as const)
+    : ([HOME_LINK] as const);
   const [checkedIn, setCheckedIn] = useState(false);
   const [since, setSince] = useState<Date | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [checkError, setCheckError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,32 +68,54 @@ export function Nav() {
   }, [currentEmployee]);
 
   async function toggleCheckIn() {
+    if (busy) return;
+    setBusy(true);
+    setCheckError("");
+
     const workDate = new Date().toISOString().split("T")[0];
     const now = new Date();
 
-    if (checkedIn) {
-      const records = await fetchAttendanceRecords(currentEmployee.id, workDate.slice(0, 7));
-      const todayRecord = records.find((r) => r.date === workDate);
-      
-      let workHours = 8;
-      if (todayRecord && todayRecord.checkIn) {
-        const diffMs = now.getTime() - new Date(todayRecord.checkIn).getTime();
-        workHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
+    try {
+      if (checkedIn) {
+        const records = await fetchAttendanceRecords(
+          currentEmployee.id,
+          workDate.slice(0, 7),
+        );
+        const todayRecord = records.find((r) => r.date === workDate);
+
+        let workHours = 8;
+        if (todayRecord?.checkIn) {
+          const diffMs = now.getTime() - new Date(todayRecord.checkIn).getTime();
+          workHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
+        }
+
+        const result = await checkOutEmployee(
+          currentEmployee.id,
+          workDate,
+          workHours,
+          0,
+        );
+
+        if (result.ok) {
+          setCheckedIn(false);
+          setSince(null);
+          router.refresh();
+        } else {
+          setCheckError(result.error ?? "Could not check out.");
+        }
+      } else {
+        const result = await checkInEmployee(currentEmployee.id, workDate);
+
+        if (result.ok) {
+          setCheckedIn(true);
+          setSince(now);
+          router.refresh();
+        } else {
+          setCheckError(result.error ?? "Could not check in.");
+        }
       }
-      
-      const ok = await checkOutEmployee(currentEmployee.id, workDate, workHours, 0);
-      if (ok) {
-        setCheckedIn(false);
-        setSince(null);
-        router.refresh();
-      }
-    } else {
-      const ok = await checkInEmployee(currentEmployee.id, workDate);
-      if (ok) {
-        setCheckedIn(true);
-        setSince(now);
-        router.refresh();
-      }
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -98,7 +129,7 @@ export function Nav() {
     <header className="sticky top-0 z-50 border-b border-line/60 backdrop-blur-md bg-paper/85 shadow-sm">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <Link
-          href="/employees"
+          href="/dashboard"
           className="flex items-center gap-2.5 transition-opacity hover:opacity-90"
         >
           <Logo size={30} priority />
@@ -108,7 +139,7 @@ export function Nav() {
         </Link>
 
         <nav className="flex items-center gap-8">
-          {LINKS.map((link) => {
+          {navLinks.map((link) => {
             const active = pathname?.startsWith(link.href);
             return (
               <Link
@@ -141,6 +172,8 @@ export function Nav() {
           <button
             type="button"
             onClick={toggleCheckIn}
+            disabled={busy}
+            title={checkError || (checkedIn ? "Check out" : "Check in")}
             className={`flex items-center gap-2 rounded-pill border px-3 py-1.5 transition-all shadow-sm hover:shadow-md ${
               checkedIn 
                 ? "border-success/30 bg-success/5 hover:bg-success/10" 
@@ -154,7 +187,11 @@ export function Nav() {
               aria-hidden
             />
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-ink/90">
-              {checkedIn && since ? `Since ${formatTime(since)}` : "Check in"}
+              {busy
+                ? "Saving…"
+                : checkedIn && since
+                  ? `Since ${formatTime(since)}`
+                  : "Check in"}
             </span>
           </button>
 
@@ -225,6 +262,14 @@ export function Nav() {
           </div>
         </div>
       </div>
+      {checkError && (
+        <div
+          role="alert"
+          className="border-t border-warn/30 bg-warn/10 px-6 py-2 text-center font-display text-xs text-warn"
+        >
+          {checkError}
+        </div>
+      )}
       <span className="sr-only">Signed in as {role}</span>
     </header>
   );

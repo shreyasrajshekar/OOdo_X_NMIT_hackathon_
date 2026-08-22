@@ -294,44 +294,107 @@ export async function fetchAttendanceRecords(employeeId: string, monthISO: strin
   }
 }
 
-export async function checkInEmployee(employeeId: string, workDate: string): Promise<boolean> {
+/** Result of a write, carrying the reason when it fails so the UI can say so. */
+export type WriteResult = { ok: boolean; error?: string };
+
+/**
+ * Check in for the day.
+ *
+ * `attendance` is unique on (employee_id, date), so a plain insert fails the
+ * moment a row already exists for today — which is what happens after a
+ * check-out, or when a status row was written for the day by anything else.
+ * Read the row first, then insert or update as appropriate.
+ */
+export async function checkInEmployee(
+  employeeId: string,
+  workDate: string,
+): Promise<WriteResult> {
+  const nowISO = new Date().toISOString();
+
   try {
-    const { error } = await supabase
+    const { data: existing, error: readError } = await supabase
       .from("attendance")
-      .insert({
-        employee_id: employeeId,
-        date: workDate,
-        check_in: new Date().toISOString(),
-        status: "present",
-      });
+      .select("id, check_in, check_out")
+      .eq("employee_id", employeeId)
+      .eq("date", workDate)
+      .maybeSingle();
+
+    if (readError) throw readError;
+
+    const row = existing as
+      | { id: number; check_in: string | null; check_out: string | null }
+      | null;
+
+    if (row) {
+      // Re-opening the day: keep the original arrival time, clear the close.
+      const { error } = await supabase
+        .from("attendance")
+        .update({
+          check_in: row.check_in ?? nowISO,
+          check_out: null,
+          status: "present",
+        })
+        .eq("id", row.id);
+
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    const { error } = await supabase.from("attendance").insert({
+      employee_id: employeeId,
+      date: workDate,
+      check_in: nowISO,
+      status: "present",
+    });
 
     if (error) throw error;
-    return true;
+    return { ok: true };
   } catch (e) {
-    console.error("checkInEmployee failed:", e);
-    return false;
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("checkInEmployee failed:", message);
+    return { ok: false, error: message };
   }
 }
 
-export async function checkOutEmployee(employeeId: string, workDate: string, workHours: number, _extraHours: number): Promise<boolean> {
-  try {
-    void _extraHours;
-    const { error } = await supabase
+/**
+ * Check out. Returns the updated row so a filter that matched nothing is
+ * reported as a failure instead of passing silently.
+ */
+export async function checkOutEmployee(
+  employeeId: string,
+  workDate: string,
+  workHours: number,
+  _extraHours: number,
+): Promise<WriteResult> {
+  void _extraHours;
 
+  try {
+    const { data, error } = await supabase
       .from("attendance")
       .update({
         check_out: new Date().toISOString(),
         hours_worked: workHours,
-        status: workHours >= 8 ? "present" : (workHours >= 4 ? "half_day" : "absent"),
+        status:
+          workHours >= 8 ? "present" : workHours >= 4 ? "half_day" : "absent",
       })
       .eq("employee_id", employeeId)
-      .eq("date", workDate);
+      .eq("date", workDate)
+      .select("id");
 
     if (error) throw error;
-    return true;
+
+    if (!data || data.length === 0) {
+      return {
+        ok: false,
+        error: "No check-in found for today, so there was nothing to close.",
+      };
+    }
+
+    return { ok: true };
   } catch (e) {
-    console.error("checkOutEmployee failed:", e);
-    return false;
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("checkOutEmployee failed:", message);
+    return { ok: false, error: message };
   }
 }
 

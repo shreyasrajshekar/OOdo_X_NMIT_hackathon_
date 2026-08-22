@@ -55,7 +55,9 @@ export default function SignInPage() {
         return;
       }
 
-      router.push("/employees");
+      // Everyone lands on their own workspace. Admins get the company-wide
+      // views from the nav; the role comes off their employee record there.
+      router.push("/dashboard");
     } catch (err) {
       setErrorMsg("An unexpected error occurred during sign in.");
       console.error(err);
