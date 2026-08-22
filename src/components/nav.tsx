@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/demo-session-provider";
 import { useAdminActions } from "@/components/admin-actions-provider";
 import { Logo } from "@/components/ui/brand";
+import ThemeToggle from "@/components/ThemeToggle";
 import { employeeInitials, employeeName } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
 import {
@@ -205,6 +206,7 @@ export function Nav() {
             </span>
           </button>
 
+          <ThemeToggle />
           <NotificationBell />
 
           <div className="relative">

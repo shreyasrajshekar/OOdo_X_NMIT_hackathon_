@@ -602,8 +602,7 @@ function EmployeeTab({ data }: { data: AllAnalytics['employee'] }) {
     return <div className="text-center text-ink/50 py-10 font-body">No employee data available</div>;
   }
 
-  // Calculate conic gradient
-  const colors = ['#5c3d54', '#875a7b', '#17a67f', '#b4552d', '#4a4a4a', '#a67c52', '#3d545c'];
+  const colors = ['var(--color-primary)', 'var(--color-plum)', 'var(--color-success)', 'var(--color-warn)', '#8a8a8a', '#c29b76', '#597984'];
   const totalEmployees = by_department.reduce((sum, d) => sum + d.count, 0);
   
   let currentAngle = 0;

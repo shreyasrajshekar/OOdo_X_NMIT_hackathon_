@@ -29,8 +29,8 @@ body {
   color: var(--color-ink);
   overflow-x: hidden;
   background-image:
-    radial-gradient(120% 80% at 50% -20%, rgba(135, 90, 123, 0.07) 0%, transparent 60%),
-    radial-gradient(90% 60% at 100% 100%, rgba(92, 61, 84, 0.04) 0%, transparent 65%);
+    radial-gradient(120% 80% at 50% -20%, color-mix(in srgb, var(--color-plum) 10%, transparent) 0%, transparent 60%),
+    radial-gradient(90% 60% at 100% 100%, color-mix(in srgb, var(--color-primary) 6%, transparent) 0%, transparent 65%);
   background-attachment: fixed;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -88,7 +88,7 @@ table,
    -------------------------------------------------------------------------- */
 
 ::selection {
-  background-color: rgba(135, 90, 123, 0.2);
+  background-color: color-mix(in srgb, var(--color-plum) 20%, transparent);
   color: var(--color-primary);
 }
 
@@ -120,11 +120,11 @@ table,
 
 .premium-card {
   backdrop-filter: blur(12px);
-  background-color: rgba(251, 249, 251, 0.85);
-  border: 1px solid rgba(237, 229, 235, 0.7);
+  background-color: color-mix(in srgb, var(--color-paper) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-line) 70%, transparent);
   box-shadow:
-    0 1px 2px rgba(92, 61, 84, 0.04),
-    0 10px 30px -12px rgba(92, 61, 84, 0.06);
+    0 1px 2px color-mix(in srgb, #000 8%, transparent),
+    0 10px 30px -12px color-mix(in srgb, #000 12%, transparent);
   transition:
     transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
     border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
@@ -133,10 +133,10 @@ table,
 
 .premium-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(135, 90, 123, 0.3);
+  border-color: color-mix(in srgb, var(--color-plum) 40%, transparent);
   box-shadow:
-    0 1px 2px rgba(92, 61, 84, 0.05),
-    0 20px 40px -16px rgba(92, 61, 84, 0.1);
+    0 1px 2px color-mix(in srgb, #000 10%, transparent),
+    0 20px 40px -16px color-mix(in srgb, #000 20%, transparent);
 }
 
 .glow-button {
@@ -147,7 +147,7 @@ table,
 }
 
 .glow-button:hover {
-  box-shadow: 0 6px 20px -6px rgba(92, 61, 84, 0.35);
+  box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--color-primary) 35%, transparent);
   transform: translateY(-1px);
 }
 
@@ -158,7 +158,7 @@ table,
 /* Glass table headers */
 thead tr {
   backdrop-filter: blur(8px);
-  background-color: rgba(237, 229, 235, 0.5) !important;
+  background-color: color-mix(in srgb, var(--color-line) 50%, transparent) !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -273,4 +273,19 @@ thead tr {
   .glow-button:hover {
     transform: none;
   }
+}
+
+
+/* --------------------------------------------------------------------------
+   Dark Mode Theme Overrides
+   Transposes the "Two Plums" palette into a dark mode.
+   -------------------------------------------------------------------------- */
+:root.dark {
+    --color-paper: #1e191d;
+    --color-ink: #fbf9fb;
+    --color-line: #382d33;
+    --color-primary: #b68caa;
+    --color-plum: #9a6d8d;
+    --color-success: #20c997;
+    --color-warn: #e07548;
 }
