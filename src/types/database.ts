@@ -303,6 +303,7 @@ export type Database = {
           is_active: boolean | null
           join_date: string | null
           last_name: string
+          login_id: string | null
           phone: string | null
           position: string | null
           role: string
@@ -317,6 +318,7 @@ export type Database = {
           is_active?: boolean | null
           join_date?: string | null
           last_name: string
+          login_id?: string | null
           phone?: string | null
           position?: string | null
           role?: string
@@ -331,6 +333,7 @@ export type Database = {
           is_active?: boolean | null
           join_date?: string | null
           last_name?: string
+          login_id?: string | null
           phone?: string | null
           position?: string | null
           role?: string

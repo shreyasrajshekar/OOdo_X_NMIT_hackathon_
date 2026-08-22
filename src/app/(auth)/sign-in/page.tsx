@@ -8,7 +8,7 @@ import { AuthField } from "@/components/ui/auth-field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { EMPLOYEES } from "@/lib/mock-data";
+import { resolveLoginIdentifier } from "@/app/actions/resolve-login";
 
 
 export default function SignInPage() {
@@ -24,21 +24,21 @@ export default function SignInPage() {
     setLoading(true);
 
     try {
-      let emailInput = identifier.trim();
-
-      // Resolve Login ID (e.g. OIJODO20220001) to email locally via EMPLOYEES mapping
-      if (!emailInput.includes("@")) {
-        const matched = EMPLOYEES.find((e) => e.loginId.toUpperCase() === emailInput.toUpperCase());
-        if (!matched) {
-          setErrorMsg("No account found for that Login ID.");
-          setLoading(false);
-          return;
-        }
-        emailInput = matched.workEmail;
+      // Resolve a Login ID (e.g. OIJODO20220001) to its email against the
+      // database. Emails are passed straight through.
+      const resolved = await resolveLoginIdentifier(identifier);
+      if (!resolved.ok) {
+        setErrorMsg(
+          resolved.reason === "unconfigured"
+            ? "Login ID sign-in is not configured on this deployment yet — sign in with your work email instead."
+            : "No account found for that Login ID.",
+        );
+        setLoading(false);
+        return;
       }
 
       const { data: authData, error } = await supabase.auth.signInWithPassword({
-        email: emailInput,
+        email: resolved.email,
         password,
       });
 

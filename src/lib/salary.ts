@@ -1,9 +1,23 @@
+// Public salary API used by the UI.
+//
+// The arithmetic lives in ./salary/engine — that module is the tested one and
+// it reports *why* a structure is invalid (forward references, unknown base
+// components, percentages over-allocating the wage, negative balances).
+// This file keeps the camelCase shape the components already import and
+// adapts it onto the engine.
+
+import { resolve, type ComponentDef, type ComponentError } from "@/lib/salary/engine";
+import { round2 } from "@/lib/utils";
+
+export type { ComponentError };
+
 export type SalaryComponent = {
   code: string;
   name: string;
-  computation: "percent_of_wage" | "percent_of_component" | "balance";
+  computation: "fixed" | "percent_of_wage" | "percent_of_component" | "balance";
   percentValue?: number;
   baseComponentCode?: string;
+  fixedAmount?: number;
   sequence: number;
 };
 
@@ -17,37 +31,32 @@ export const DEFAULT_COMPONENTS: SalaryComponent[] = [
   { code: "FIXED", name: "Fixed Allowance", computation: "balance", sequence: 99 },
 ];
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+function toDef(c: SalaryComponent): ComponentDef {
+  return {
+    code: c.code,
+    name: c.name,
+    computation: c.computation,
+    percent_value: c.percentValue ?? null,
+    base_component_code: c.baseComponentCode ?? null,
+    fixed_amount: c.fixedAmount ?? null,
+    sequence: c.sequence,
+  };
 }
 
+/** Amounts only — kept for the existing call sites. */
 export function resolveComponents(
   wage: number,
   components: SalaryComponent[] = DEFAULT_COMPONENTS,
 ): Record<string, number> {
-  const resolved: Record<string, number> = {};
-  const ordered = [...components].sort((a, b) => a.sequence - b.sequence);
+  return resolve(wage, components.map(toDef)).amounts;
+}
 
-  for (const component of ordered) {
-    let amount = 0;
-    switch (component.computation) {
-      case "percent_of_wage":
-        amount = (wage * (component.percentValue ?? 0)) / 100;
-        break;
-      case "percent_of_component":
-        amount =
-          ((resolved[component.baseComponentCode ?? ""] ?? 0) *
-            (component.percentValue ?? 0)) /
-          100;
-        break;
-      case "balance":
-        amount = wage - Object.values(resolved).reduce((sum, v) => sum + v, 0);
-        break;
-    }
-    resolved[component.code] = round2(amount);
-  }
-
-  return resolved;
+/** Amounts plus the validation errors the engine found. */
+export function resolveComponentsDetailed(
+  wage: number,
+  components: SalaryComponent[] = DEFAULT_COMPONENTS,
+) {
+  return resolve(wage, components.map(toDef));
 }
 
 export type PayrollConfig = {
