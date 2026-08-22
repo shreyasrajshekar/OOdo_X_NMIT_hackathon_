@@ -82,7 +82,7 @@ export default function EmployeesPage() {
         placeholder="Search employees"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-sm rounded-pill border border-line px-4 py-2 font-display text-sm text-ink outline-none focus:border-plum"
+        className="w-full max-w-sm rounded-pill border border-line px-4 py-2 font-display text-sm text-ink focus:border-plum"
       />
 
       {filtered.length === 0 ? (

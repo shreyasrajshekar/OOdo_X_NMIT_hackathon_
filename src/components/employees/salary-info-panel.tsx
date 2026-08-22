@@ -74,7 +74,7 @@ export function SalaryInfoPanel({
                     setWage(Number(e.target.value) || 0);
                     setSaved(false);
                   }}
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 font-display text-sm tabular-nums text-ink outline-none focus:border-plum"
+                  className="mt-1 w-full rounded-card border border-line px-3 py-2 font-display text-sm tabular-nums text-ink focus:border-plum"
                 />
                 {hasChanged && (
                   <button
