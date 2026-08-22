@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useDemoSession } from "@/components/demo-session-provider";
+import { useSession } from "@/components/demo-session-provider";
 import { SalaryInfoPanel } from "@/components/employees/salary-info-panel";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/field";
@@ -12,16 +12,24 @@ import {
   type Employee,
 } from "@/lib/mock-data";
 import { fetchEmployeeById, updateEmployeeInDb } from "@/lib/supabase-db";
+import { supabase } from "@/lib/supabase";
 
 type TabKey = "resume" | "private" | "salary" | "security";
 
 export function ProfileView({ id }: { id: string }) {
-  const { role, currentEmployee } = useDemoSession();
+  const { isAdmin, currentEmployee } = useSession();
   const [employee, setEmployee] = useState<Employee | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<TabKey>("resume");
   const [skills, setSkills] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMsg, setPasswordMsg] = useState<{
+    tone: "ok" | "error";
+    text: string;
+  } | null>(null);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     fetchEmployeeById(id).then((emp) => {
@@ -56,8 +64,9 @@ export function ProfileView({ id }: { id: string }) {
     );
   }
 
-  const isAdmin = role === "admin";
   const isSelf = currentEmployee?.id === employee.id;
+  // Private info: the owner and Admin/HR. Salary: Admin/HR, plus your own.
+  // Security: only the owner can change their own password.
   const canViewPrivate = isAdmin || isSelf;
   const canViewSalary = isAdmin || isSelf;
   const canViewSecurity = isSelf;
@@ -75,6 +84,36 @@ export function ProfileView({ id }: { id: string }) {
     });
   }
 
+
+  async function handlePasswordChange(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordMsg(null);
+
+    if (newPassword.length < 8) {
+      setPasswordMsg({
+        tone: "error",
+        text: "Password must be at least 8 characters.",
+      });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ tone: "error", text: "Passwords do not match." });
+      return;
+    }
+
+    setSavingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSavingPassword(false);
+
+    if (error) {
+      setPasswordMsg({ tone: "error", text: error.message });
+      return;
+    }
+
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordMsg({ tone: "ok", text: "Password updated." });
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -232,18 +271,44 @@ export function ProfileView({ id }: { id: string }) {
       )}
 
       {active === "security" && canViewSecurity && (
-        <form className="flex max-w-md flex-col gap-4">
-          <Field label="Current password">
-            <input type="password" className={inputClass} />
-          </Field>
+        <form
+          className="flex max-w-md flex-col gap-4"
+          onSubmit={handlePasswordChange}
+        >
+          {passwordMsg && (
+            <div
+              role="alert"
+              className={`rounded-card border p-3 font-display text-sm ${
+                passwordMsg.tone === "ok"
+                  ? "border-success/30 bg-success/10 text-ink"
+                  : "border-warn/30 bg-warn/10 text-warn"
+              }`}
+            >
+              {passwordMsg.text}
+            </div>
+          )}
           <Field label="New password">
-            <input type="password" className={inputClass} />
+            <input
+              type="password"
+              required
+              autoComplete="new-password"
+              className={inputClass}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
           </Field>
           <Field label="Confirm new password">
-            <input type="password" className={inputClass} />
+            <input
+              type="password"
+              required
+              autoComplete="new-password"
+              className={inputClass}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
           </Field>
-          <Button type="submit" className="mt-2 w-full">
-            Update password
+          <Button type="submit" disabled={savingPassword} className="mt-2 w-full">
+            {savingPassword ? "Updating…" : "Update password"}
           </Button>
         </form>
       )}

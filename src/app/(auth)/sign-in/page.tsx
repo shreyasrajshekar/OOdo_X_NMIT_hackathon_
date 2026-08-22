@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AuthBrand } from "@/components/ui/brand";
+import { AuthField } from "@/components/ui/auth-field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
@@ -21,7 +24,8 @@ export default function SignInPage() {
     try {
       let emailInput = identifier.trim();
 
-      // If it's a login ID (doesn't contain @), resolve it to work email
+      // A Login ID (e.g. OIJODO20220001) has no "@" — resolve it to the
+      // employee's work email before handing it to Supabase Auth.
       if (!emailInput.includes("@")) {
         const { data, error } = await supabase
           .from("employees")
@@ -33,21 +37,43 @@ export default function SignInPage() {
           console.warn("Error looking up login ID:", error.message);
         }
 
-        if (data?.work_email) {
-          emailInput = data.work_email;
+        if (!data?.work_email) {
+          setErrorMsg("No account found for that Login ID.");
+          setLoading(false);
+          return;
         }
+
+        emailInput = data.work_email;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: emailInput,
-        password: password,
+        password,
       });
 
       if (error) {
         setErrorMsg(error.message);
-      } else {
-        router.push("/employees");
+        setLoading(false);
+        return;
       }
+
+      // Employees created by HR/Admin start on a system-generated password
+      // and must replace it before they reach the app.
+      const userId = authData.user?.id;
+      if (userId) {
+        const { data: employee } = await supabase
+          .from("employees")
+          .select("must_change_password")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (employee?.must_change_password) {
+          router.push("/change-password");
+          return;
+        }
+      }
+
+      router.push("/employees");
     } catch (err) {
       setErrorMsg("An unexpected error occurred during sign in.");
       console.error(err);
@@ -58,62 +84,49 @@ export default function SignInPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-display text-[25px] font-bold tracking-tight text-ink">
-          Sign in
-        </h1>
-        <p className="mt-1 font-body text-[15px] text-ink/70">
-          Use your Login ID or work email.
-        </p>
-      </div>
+      <AuthBrand />
 
       {errorMsg && (
-        <div className="rounded border border-warn/30 bg-warn/10 p-3 text-sm text-warn">
+        <div
+          role="alert"
+          className="rounded-card border border-warn/30 bg-warn/10 p-3 font-display text-sm text-warn"
+        >
           {errorMsg}
         </div>
       )}
 
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1.5">
-          <span className="font-display text-sm font-semibold text-ink">
-            Login ID or email
-          </span>
-          <input
-            type="text"
-            required
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            disabled={loading}
-            className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
-          />
-        </label>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+        <AuthField
+          label="Login Id/Email"
+          value={identifier}
+          onChange={setIdentifier}
+          disabled={loading}
+          autoComplete="username"
+        />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-display text-sm font-semibold text-ink">
-            Password
-          </span>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-            className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
-          />
-        </label>
+        <PasswordInput
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          disabled={loading}
+          autoComplete="current-password"
+        />
 
-        <Button type="submit" disabled={loading} className="mt-2 w-full">
-          {loading ? "Signing in..." : "Sign in"}
+        <Button
+          type="submit"
+          disabled={loading}
+          className="mt-2 w-full uppercase tracking-[0.08em]"
+        >
+          {loading ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 
-      <p className="font-body text-[15px] text-ink/70">
-        Setting up a company?{" "}
-        <Link href="/sign-up" className="font-semibold text-primary">
-          Create an account
+      <p className="text-center font-body text-[15px] text-ink/70">
+        Don&apos;t have an Account?{" "}
+        <Link href="/sign-up" className="font-semibold text-primary underline-offset-2 hover:underline">
+          Sign Up
         </Link>
       </p>
     </div>
   );
 }
-

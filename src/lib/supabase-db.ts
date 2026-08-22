@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { EMPLOYEES, LEAVE_ALLOCATIONS, LEAVE_REQUESTS, type Employee, type LeaveRequest, type LeaveAllocation, type AttendanceRecord, type AttendanceStatus, type RequestStatus, type Department, type LeaveTypeCode } from "./mock-data";
+import { COMPANY_NAME, EMPLOYEES, LEAVE_ALLOCATIONS, LEAVE_REQUESTS, type Employee, type LeaveRequest, type LeaveAllocation, type AttendanceRecord, type AttendanceStatus, type RequestStatus, type Department, type LeaveTypeCode } from "./mock-data";
 
 // Helper to determine if a database error is a missing table (PGRST205)
 function isMissingTableError(error: { code?: string; message?: string } | null | undefined): boolean {
@@ -196,19 +196,39 @@ export async function fetchEmployees(): Promise<Employee[]> {
   }
 }
 
+/** Name of the tenant company, used for Login IDs and outbound email. */
+export async function fetchCompanyName(): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("companies")
+      .select("name")
+      .limit(1)
+      .maybeSingle();
+    const name = (data as { name?: string } | null)?.name;
+    if (name) return name;
+  } catch (e) {
+    console.warn("Could not read the company name:", e);
+  }
+  return COMPANY_NAME;
+}
+
 export async function fetchEmployeeById(id: string): Promise<Employee | undefined> {
   const employees = await fetchEmployees();
   return employees.find((e) => e.id.toLowerCase() === id.toLowerCase() || e.loginId.toLowerCase() === id.toLowerCase());
 }
 
 
-export async function createEmployeeInDb(data: Omit<Employee, "id">, companyId?: string): Promise<Employee> {
+export async function createEmployeeInDb(
+  data: Omit<Employee, "id">,
+  companyId?: string,
+  authUserId?: string,
+): Promise<Employee> {
   const activeCompanyId = companyId || await getDefaultCompanyId();
 
   try {
-    // 1. Create a dummy Auth User or insert employee directly if Auth is handled separately.
-    // For demo/integration robustness, we attempt to check if the schema matches:
-    const tempUserId = crypto.randomUUID();
+    // The employee row shares its id with the Supabase Auth user created for
+    // them, so the system-generated password actually signs them in.
+    const tempUserId = authUserId || crypto.randomUUID();
 
     const { data: newEmp, error } = await supabase
       .from("employees")

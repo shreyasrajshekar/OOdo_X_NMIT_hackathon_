@@ -3,17 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmployeeCard } from "@/components/employee-card";
-import { NewEmployeeModal } from "@/components/employees/new-employee-modal";
-import { useDemoSession } from "@/components/demo-session-provider";
+import { useSession } from "@/components/demo-session-provider";
+import { useAdminActions } from "@/components/admin-actions-provider";
 import { employeeName, type Employee } from "@/lib/mock-data";
 import { fetchEmployees } from "@/lib/supabase-db";
 
 export default function EmployeesPage() {
-  const { role } = useDemoSession();
+  const { isAdmin } = useSession();
+  const { openAddUser, onUserCreated } = useAdminActions();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     fetchEmployees().then((data) => {
@@ -22,6 +22,18 @@ export default function EmployeesPage() {
     });
   }, []);
 
+  // Keep the directory in step with users added from the nav.
+  useEffect(
+    () =>
+      onUserCreated((employee) =>
+        setEmployees((current) =>
+          current.some((e) => e.id === employee.id)
+            ? current
+            : [...current, employee],
+        ),
+      ),
+    [onUserCreated],
+  );
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -42,13 +54,12 @@ export default function EmployeesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <p className="font-display text-sm font-semibold text-ink/70 animate-pulse">
+        <p className="animate-pulse font-display text-sm font-semibold text-ink/70">
           Loading employees...
         </p>
       </div>
     );
   }
-
 
   return (
     <div className="flex flex-col gap-8">
@@ -58,12 +69,12 @@ export default function EmployeesPage() {
             Employees
           </h1>
           <p className="mt-1 font-body text-[15px] text-ink/70">
-            Everyone at the company, in one place.
+            {isAdmin
+              ? "Everyone at the company. Add a user and the system emails them their Login ID and first password."
+              : "Everyone at the company, in one place."}
           </p>
         </div>
-        {role === "admin" && (
-          <Button onClick={() => setModalOpen(true)}>New employee</Button>
-        )}
+        {isAdmin && <Button onClick={openAddUser}>Add user</Button>}
       </div>
 
       <input
@@ -90,15 +101,6 @@ export default function EmployeesPage() {
           ))}
         </div>
       )}
-
-      <NewEmployeeModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        existingLoginIds={employees.map((e) => e.loginId)}
-        onCreated={(employee) =>
-          setEmployees((current) => [...current, employee])
-        }
-      />
     </div>
   );
 }

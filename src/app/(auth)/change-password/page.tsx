@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AuthBrand } from "@/components/ui/brand";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 
@@ -16,6 +18,11 @@ export default function ChangePasswordPage() {
     event.preventDefault();
     setErrorMsg("");
 
+    if (password.length < 8) {
+      setErrorMsg("Password must be at least 8 characters.");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setErrorMsg("Passwords do not match.");
       return;
@@ -24,10 +31,9 @@ export default function ChangePasswordPage() {
     setLoading(true);
 
     try {
-      // 1. Update password in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.updateUser({
-        password: password,
-      });
+      // 1. Replace the system-generated password.
+      const { data: authData, error: authError } =
+        await supabase.auth.updateUser({ password });
 
       if (authError) {
         setErrorMsg(authError.message);
@@ -37,7 +43,7 @@ export default function ChangePasswordPage() {
 
       const userId = authData.user?.id;
       if (userId) {
-        // 2. Set must_change_password = false in the employees table
+        // 2. Clear the forced-reset flag.
         await supabase
           .from("employees")
           .update({ must_change_password: false })
@@ -55,56 +61,47 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <AuthBrand />
+
       <div>
         <h1 className="font-display text-[25px] font-bold tracking-tight text-ink">
           Set a new password
         </h1>
         <p className="mt-1 font-body text-[15px] text-ink/70">
-          This is your first sign-in. Choose a password only you know before
-          continuing.
+          You signed in with the password the system generated for you. Choose
+          one only you know before continuing.
         </p>
       </div>
 
       {errorMsg && (
-        <div className="rounded border border-warn/30 bg-warn/10 p-3 text-sm text-warn">
+        <div
+          role="alert"
+          className="rounded-card border border-warn/30 bg-warn/10 p-3 font-display text-sm text-warn"
+        >
           {errorMsg}
         </div>
       )}
 
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1.5">
-          <span className="font-display text-sm font-semibold text-ink">
-            New password
-          </span>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-            className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="font-display text-sm font-semibold text-ink">
-            Confirm new password
-          </span>
-          <input
-            type="password"
-            required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            disabled={loading}
-            className="rounded-card border border-line px-3 py-2 font-display text-sm text-ink outline-none focus:border-plum"
-          />
-        </label>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+        <PasswordInput
+          label="New Password"
+          value={password}
+          onChange={setPassword}
+          disabled={loading}
+          autoComplete="new-password"
+        />
+        <PasswordInput
+          label="Confirm Password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          disabled={loading}
+          autoComplete="new-password"
+        />
 
         <Button type="submit" disabled={loading} className="mt-2 w-full">
-          {loading ? "Updating password..." : "Continue"}
+          {loading ? "Updating password…" : "Continue"}
         </Button>
       </form>
     </div>
   );
 }
-

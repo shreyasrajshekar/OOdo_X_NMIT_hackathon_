@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useDemoSession } from "@/components/demo-session-provider";
+import { useSession } from "@/components/demo-session-provider";
 import { supabase } from "@/lib/supabase";
-import { fetchAttendanceRecords } from "@/lib/supabase-db";
+import { fetchAttendanceRecords, fetchEmployees } from "@/lib/supabase-db";
 import {
-  EMPLOYEES,
   employeeName,
+  type Employee,
   getAttendanceRecord,
   toISODate,
   today,
@@ -92,6 +92,13 @@ function AdminAttendance() {
   const [selectedDate, setSelectedDate] = useState(today());
   const [view, setView] = useState<ViewMode>("day");
   const [dbRecords, setDbRecords] = useState<DbAttendanceRow[]>([]);
+  const [roster, setRoster] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    fetchEmployees()
+      .then(setRoster)
+      .catch((err) => console.warn("Failed to load the roster:", err));
+  }, []);
 
   useEffect(() => {
     const fetchAdminLogs = async () => {
@@ -113,10 +120,10 @@ function AdminAttendance() {
 
   const employees = useMemo(
     () =>
-      EMPLOYEES.filter((e) =>
+      roster.filter((e) =>
         employeeName(e).toLowerCase().includes(search.toLowerCase()),
       ),
-    [search],
+    [roster, search],
   );
 
   const range = useMemo(() => rangeForView(selectedDate, view), [selectedDate, view]);
@@ -281,7 +288,7 @@ function AdminAttendance() {
 }
 
 function EmployeeAttendance() {
-  const { currentEmployee } = useDemoSession();
+  const { currentEmployee } = useSession();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -425,7 +432,7 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
 }
 
 export default function AttendancePage() {
-  const { role } = useDemoSession();
+  const { role } = useSession();
 
   return (
     <div className="flex flex-col gap-8">

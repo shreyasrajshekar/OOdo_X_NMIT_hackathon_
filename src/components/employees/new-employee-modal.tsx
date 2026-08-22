@@ -6,6 +6,8 @@ import { Field, inputClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { generateLoginId, nextSerial } from "@/lib/login-id";
 import { generateTempPassword } from "@/lib/password";
+import { createEmployeeAccount } from "@/app/actions/employees";
+import { fetchCompanyName } from "@/lib/supabase-db";
 import {
   COMPANY_NAME,
   DEPARTMENTS,
@@ -17,6 +19,8 @@ type FormState = {
   firstName: string;
   lastName: string;
   workEmail: string;
+  mobile: string;
+  role: "employee" | "admin";
   department: Department;
   jobTitle: string;
   manager: string;
@@ -28,6 +32,8 @@ const EMPTY_FORM: FormState = {
   firstName: "",
   lastName: "",
   workEmail: "",
+  mobile: "",
+  role: "employee",
   department: "Engineering",
   jobTitle: "",
   manager: "",
@@ -35,42 +41,63 @@ const EMPTY_FORM: FormState = {
   monthlyWage: "",
 };
 
+type Created = {
+  loginId: string;
+  tempPassword: string;
+  email: string;
+  emailSent: boolean;
+  emailError?: string;
+};
+
 export function NewEmployeeModal({
   open,
   onClose,
   existingLoginIds,
   onCreated,
+  companyPrefix,
 }: {
   open: boolean;
   onClose: () => void;
   existingLoginIds: string[];
   onCreated: (employee: Employee) => void;
+  /** Two-letter company prefix, taken from the signed-in admin's Login ID. */
+  companyPrefix?: string;
 }) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [created, setCreated] = useState<{
-    loginId: string;
-    tempPassword: string;
-  } | null>(null);
+  const [created, setCreated] = useState<Created | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [companyName, setCompanyName] = useState(COMPANY_NAME);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setForm(EMPTY_FORM);
       setCreated(null);
+      setSubmitting(false);
+      setErrorMsg("");
+      setCopied(false);
+      return;
     }
+    fetchCompanyName().then(setCompanyName).catch(() => {});
   }, [open]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.firstName || !form.lastName || !form.workEmail) return;
+
+    setSubmitting(true);
+    setErrorMsg("");
 
     const joiningYear = new Date(form.joiningDate).getFullYear();
     const serial = nextSerial(existingLoginIds, joiningYear);
     const loginId = generateLoginId({
-      companyName: COMPANY_NAME,
+      companyName,
+      companyPrefix,
       firstName: form.firstName,
       lastName: form.lastName,
       joiningYear,
@@ -85,8 +112,8 @@ export function NewEmployeeModal({
       lastName: form.lastName,
       workEmail: form.workEmail,
       personalEmail: "",
-      mobile: "",
-      role: "employee",
+      mobile: form.mobile,
+      role: form.role,
       department: form.department,
       jobTitle: form.jobTitle || "—",
       manager: form.manager || "—",
@@ -112,28 +139,74 @@ export function NewEmployeeModal({
       certifications: [],
     };
 
-    // Call Supabase DB helper
-    import("@/lib/supabase-db").then(({ createEmployeeInDb }) => {
-      createEmployeeInDb(employee).then((savedEmp) => {
-        onCreated(savedEmp);
-        setCreated({ loginId, tempPassword });
+    try {
+      // 1. Create the login with the system-generated password and email the
+      //    credentials to the new user.
+      const account = await createEmployeeAccount({
+        email: form.workEmail.trim(),
+        password: tempPassword,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        loginId,
+        companyName,
       });
-    }).catch(err => {
-      console.error("Failed to load supabase db client:", err);
-      // Fallback
-      onCreated(employee);
-      setCreated({ loginId, tempPassword });
-    });
+
+      if (account.error) {
+        setErrorMsg(`Could not create the login: ${account.error}`);
+        setSubmitting(false);
+        return;
+      }
+
+      // 2. Insert the employee record, keyed to that Auth user.
+      const { createEmployeeInDb } = await import("@/lib/supabase-db");
+      const savedEmp = await createEmployeeInDb(
+        employee,
+        undefined,
+        account.userId,
+      );
+
+      onCreated(savedEmp);
+      setCreated({
+        loginId,
+        tempPassword,
+        email: form.workEmail.trim(),
+        emailSent: account.emailSent,
+        emailError: account.emailError,
+      });
+    } catch (err) {
+      console.error("Failed to create employee:", err);
+      setErrorMsg("Could not save the employee. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="New employee">
+    <Modal open={open} onClose={onClose} title="Add user">
       {created ? (
         <div className="flex flex-col gap-4">
-          <p className="font-body text-[15px] text-ink/70">
-            Credentials generated. This password will not be shown again —
-            copy it now.
-          </p>
+          {created.emailSent ? (
+            <div className="rounded-card border border-success/30 bg-success/10 p-3">
+              <p className="font-display text-sm font-semibold text-ink">
+                Credentials emailed to {created.email}
+              </p>
+              <p className="mt-1 font-body text-[15px] text-ink/70">
+                They&apos;ll be asked to set their own password on first
+                sign-in.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-card border border-warn/30 bg-warn/10 p-3">
+              <p className="font-display text-sm font-semibold text-warn">
+                The account was created, but the email didn&apos;t send.
+              </p>
+              <p className="mt-1 font-body text-[15px] text-ink/70">
+                {created.emailError || "Unknown mail error."} Copy the
+                credentials below and pass them on yourself.
+              </p>
+            </div>
+          )}
+
           <div className="rounded-card border border-line p-4">
             <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-plum">
               Login ID
@@ -150,16 +223,18 @@ export function NewEmployeeModal({
               {created.tempPassword}
             </p>
           </div>
+
           <Button
             type="button"
+            variant="secondary"
             onClick={() => {
               navigator.clipboard?.writeText(
                 `Login ID: ${created.loginId}\nPassword: ${created.tempPassword}`,
               );
+              setCopied(true);
             }}
-            variant="secondary"
           >
-            Copy credentials
+            {copied ? "Copied" : "Copy credentials"}
           </Button>
           <Button type="button" onClick={onClose}>
             Done
@@ -167,6 +242,20 @@ export function NewEmployeeModal({
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <p className="font-body text-[15px] text-ink/70">
+            The system generates the Login ID and first password, then emails
+            both to the new user.
+          </p>
+
+          {errorMsg && (
+            <div
+              role="alert"
+              className="rounded-card border border-warn/30 bg-warn/10 p-3 font-display text-sm text-warn"
+            >
+              {errorMsg}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <Field label="First name">
               <input
@@ -195,6 +284,29 @@ export function NewEmployeeModal({
               onChange={(e) => update("workEmail", e.target.value)}
             />
           </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Mobile">
+              <input
+                type="tel"
+                className={inputClass}
+                value={form.mobile}
+                onChange={(e) => update("mobile", e.target.value)}
+              />
+            </Field>
+            <Field label="Access level">
+              <select
+                className={inputClass}
+                value={form.role}
+                onChange={(e) =>
+                  update("role", e.target.value as FormState["role"])
+                }
+              >
+                <option value="employee">Employee</option>
+                <option value="admin">Admin / HR</option>
+              </select>
+            </Field>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Department">
@@ -241,8 +353,8 @@ export function NewEmployeeModal({
             </Field>
           </div>
 
-          <Button type="submit" className="mt-2 w-full">
-            Create employee
+          <Button type="submit" disabled={submitting} className="mt-2 w-full">
+            {submitting ? "Creating account…" : "Create user & send email"}
           </Button>
         </form>
       )}

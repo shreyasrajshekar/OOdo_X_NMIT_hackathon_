@@ -5,7 +5,8 @@ function initials(value: string, length: number): string {
   return letters.slice(0, length).padEnd(length, "X");
 }
 
-function companyInitials(companyName: string): string {
+/** First letters of the company name: "Odoo India" -> "OI". */
+export function companyInitials(companyName: string): string {
   const words = companyName.trim().split(/\s+/).filter(Boolean);
   if (words.length >= 2) {
     return (words[0][0] + words[1][0]).toUpperCase();
@@ -23,10 +24,15 @@ export function generateLoginId(params: {
   lastName: string;
   joiningYear: number;
   serial: number;
+  /** Overrides the derived company prefix, e.g. taken from an existing ID. */
+  companyPrefix?: string;
 }): string {
   const { companyName, firstName, lastName, joiningYear, serial } = params;
+  const prefix = params.companyPrefix
+    ? initials(params.companyPrefix, 2)
+    : companyInitials(companyName);
   return [
-    companyInitials(companyName),
+    prefix,
     initials(firstName, 2),
     initials(lastName, 2),
     String(joiningYear).padStart(4, "0"),

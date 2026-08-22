@@ -1,23 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useDemoSession } from "@/components/demo-session-provider";
+import { useSession } from "@/components/demo-session-provider";
 import { Button } from "@/components/ui/button";
 import { Tabs } from "@/components/ui/tabs";
 import { AllocationPanel } from "@/components/time-off/allocation-panel";
 import { TimeOffRequestModal } from "@/components/time-off/request-modal";
 import { CalendarLegend, YearCalendar } from "@/components/time-off/year-calendar";
 import {
-  EMPLOYEES,
   HOLIDAYS,
   LEAVE_TYPES,
   employeeName,
+  type Employee,
   leaveBalance,
   type LeaveAllocation,
   type LeaveRequest,
   type RequestStatus,
 } from "@/lib/mock-data";
-import { fetchLeaveRequests, fetchLeaveAllocations, updateLeaveRequestStatus } from "@/lib/supabase-db";
+import { fetchEmployees, fetchLeaveRequests, fetchLeaveAllocations, updateLeaveRequestStatus } from "@/lib/supabase-db";
 
 const STATUS_STYLE: Record<RequestStatus, string> = {
   approved: "text-success",
@@ -26,21 +26,24 @@ const STATUS_STYLE: Record<RequestStatus, string> = {
 };
 
 function AdminTimeOff() {
-  const { currentEmployee } = useDemoSession();
+  const { currentEmployee } = useSession();
   const [tab, setTab] = useState<"requests" | "allocation">("requests");
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [allocations, setAllocations] = useState<LeaveAllocation[]>([]);
+  const [roster, setRoster] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [reqs, allocs] = await Promise.all([
+        const [reqs, allocs, people] = await Promise.all([
           fetchLeaveRequests(),
-          fetchLeaveAllocations(currentEmployee.id)
+          fetchLeaveAllocations(currentEmployee.id),
+          fetchEmployees(),
         ]);
         setRequests(reqs);
         setAllocations(allocs);
+        setRoster(people);
       } catch (err) {
         console.error(err);
       } finally {
@@ -93,7 +96,7 @@ function AdminTimeOff() {
             </thead>
             <tbody>
               {requests.map((request) => {
-                const employee = EMPLOYEES.find((e) => e.id === request.employeeId);
+                const employee = roster.find((e) => e.id === request.employeeId);
                 const type = LEAVE_TYPES.find((t) => t.code === request.leaveType);
                 return (
                   <tr key={request.id} className="border-b border-line/60">
@@ -155,7 +158,7 @@ function AdminTimeOff() {
 }
 
 function EmployeeTimeOff() {
-  const { currentEmployee } = useDemoSession();
+  const { currentEmployee } = useSession();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [allocations, setAllocations] = useState<LeaveAllocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,7 +327,7 @@ function EmployeeTimeOff() {
 }
 
 export default function TimeOffPage() {
-  const { role } = useDemoSession();
+  const { role } = useSession();
 
   return (
     <div className="flex flex-col gap-8">
